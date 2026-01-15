@@ -11,6 +11,11 @@ import (
 	"github.com/fogleman/gg"
 )
 
+var (
+	version = "dev"
+	commit  = "unknown"
+)
+
 func main() {
 	if err := run(); err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
@@ -74,8 +79,18 @@ func parseFlags() (*Options, error) {
 	bgColor := flag.String("bg", "#1a1a2e", "Background color (hex)")
 	titleFont := flag.String("title-font", "", "Title font file path (TTF)")
 	urlFont := flag.String("url-font", "", "URL font file path (TTF)")
+	versionFlag := flag.Bool("version", false, "Print version and exit")
 
 	flag.Parse()
+
+	if *versionFlag {
+		versionStr := version
+		if versionStr == "dev" {
+			versionStr = commit
+		}
+		fmt.Println("og-image-generator version " + versionStr)
+		os.Exit(0)
+	}
 
 	if *title == "" || *url == "" {
 		flag.PrintDefaults()

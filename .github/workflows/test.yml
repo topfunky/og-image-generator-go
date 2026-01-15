@@ -24,6 +24,9 @@ jobs:
       - name: Run tests
         run: go test -v -race -coverprofile=coverage.out ./...
 
+      - name: Build with commit
+        run: go build -ldflags="-X main.commit=${{ github.sha }}" -o og-image-generator
+
       - name: Upload coverage
         uses: codecov/codecov-action@v4
         with:

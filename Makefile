@@ -14,7 +14,7 @@ help:
 
 # Build the binary
 build:
-	go build -o og-image-generator
+	go build -ldflags="-X main.commit=$$(git rev-parse --short HEAD)" -o og-image-generator
 
 # Remove build artifacts
 clean:
