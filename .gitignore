@@ -5,6 +5,9 @@ og-image-generator
 *.so
 *.dylib
 
+# Font files
+fonts/*
+
 # Test outputs
 out/*
 test-image.png
