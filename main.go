@@ -166,9 +166,22 @@ func drawTitle(dc *gg.Context, title, fontPath string, width int) error {
 	return nil
 }
 
-func drawURL(dc *gg.Context, url, fontPath string, _, height int) error {
-	if err := dc.LoadFontFace(fontPath, 40); err != nil {
-		return fmt.Errorf("load font for url: %w", err)
+func drawURL(dc *gg.Context, url, fontPath string, width, height int) error {
+	maxWidth := float64(width) - 120.0
+	fontSize := 40.0
+	minFontSize := 16.0
+
+	for fontSize >= minFontSize {
+		if err := dc.LoadFontFace(fontPath, fontSize); err != nil {
+			return fmt.Errorf("load font for url: %w", err)
+		}
+
+		textWidth, _ := dc.MeasureString(url)
+		if textWidth <= maxWidth {
+			break
+		}
+
+		fontSize -= 2.0
 	}
 
 	mutedColor := color.RGBA{R: 200, G: 200, B: 200, A: 220}
