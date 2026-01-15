@@ -24,7 +24,12 @@ func run() error {
 		return err
 	}
 
-	fontPath, err := resolveFontPath(opts.Font)
+	titleFontPath, err := resolveFontPath(opts.TitleFont)
+	if err != nil {
+		return err
+	}
+
+	urlFontPath, err := resolveFontPath(opts.URLFont)
 	if err != nil {
 		return err
 	}
@@ -33,11 +38,11 @@ func run() error {
 
 	drawBackground(dc, opts.BgColor, opts.Width, opts.Height)
 
-	if err := drawTitle(dc, opts.Title, fontPath, opts.Width); err != nil {
+	if err := drawTitle(dc, opts.Title, titleFontPath, opts.Width); err != nil {
 		return err
 	}
 
-	if err := drawURL(dc, opts.URL, fontPath, opts.Width, opts.Height); err != nil {
+	if err := drawURL(dc, opts.URL, urlFontPath, opts.Width, opts.Height); err != nil {
 		return err
 	}
 
@@ -50,13 +55,14 @@ func run() error {
 }
 
 type Options struct {
-	Title   string
-	URL     string
-	Output  string
-	Width   int
-	Height  int
-	BgColor string
-	Font    string
+	Title     string
+	URL       string
+	Output    string
+	Width     int
+	Height    int
+	BgColor   string
+	TitleFont string
+	URLFont   string
 }
 
 func parseFlags() (*Options, error) {
@@ -66,7 +72,8 @@ func parseFlags() (*Options, error) {
 	width := flag.Int("width", 1200, "Image width in pixels")
 	height := flag.Int("height", 628, "Image height in pixels")
 	bgColor := flag.String("bg", "#1a1a2e", "Background color (hex)")
-	font := flag.String("font", "", "Font file path (TTF)")
+	titleFont := flag.String("title-font", "", "Title font file path (TTF)")
+	urlFont := flag.String("url-font", "", "URL font file path (TTF)")
 
 	flag.Parse()
 
@@ -76,13 +83,14 @@ func parseFlags() (*Options, error) {
 	}
 
 	return &Options{
-		Title:   *title,
-		URL:     *url,
-		Output:  *output,
-		Width:   *width,
-		Height:  *height,
-		BgColor: *bgColor,
-		Font:    *font,
+		Title:     *title,
+		URL:       *url,
+		Output:    *output,
+		Width:     *width,
+		Height:    *height,
+		BgColor:   *bgColor,
+		TitleFont: *titleFont,
+		URLFont:   *urlFont,
 	}, nil
 }
 

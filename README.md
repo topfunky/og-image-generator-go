@@ -46,6 +46,18 @@ go build -o og-image-generator
   -bg "#1a1a2e"
 ```
 
+Alternate example
+
+```bash
+./og-image-generator \
+	-title "This is a test many lines of text one after the other" \
+  -title-font fonts/MonaspaceKryptonFrozen-ExtraBold.ttf \
+	-url "https://example.com" \
+	-url-font fonts/MonaspaceKryptonFrozen-Medium.ttf \
+	-output out/krypton.png \
+	-bg "#002052"
+```
+
 ### Command-Line Flags
 
 | Flag | Default | Description |
@@ -104,12 +116,12 @@ To use a custom TrueType font:
    cp ~/Downloads/MyFont-Bold.ttf ./fonts/
    ```
 
-2. **Edit `main.go` and update the `fontPath` variable:**
+1. **Edit `main.go` and update the `fontPath` variable:**
    ```go
    fontPath := filepath.Join("fonts", "MyFont-Bold.ttf")
    ```
 
-3. **Rebuild the application:**
+1. **Rebuild the application:**
    ```bash
    go build -o og-image-generator
    ```
