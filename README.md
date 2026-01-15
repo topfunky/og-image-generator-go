@@ -15,11 +15,18 @@ Based on the approach from [Mat Ryer's blog post](https://pace.dev/blog/2020/03/
 
 ## Installation
 
-### Prerequisites
+### Homebrew (macOS and Linux)
+
+```bash
+brew tap topfunky/tap
+brew install topfunky/tap/og-image-generator
+```
+
+### Build from Source
+
+#### Prerequisites
 
 - Go 1.21 or later
-
-### Build
 
 ```bash
 go mod download
