@@ -1,0 +1,33 @@
+# Binaries
+og-image-generator
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Test outputs
+out/*
+test-image.png
+example-*.png
+dark-image.png
+wide-image.png
+long-title.png
+social-image.png
+*.png
+
+# Go build cache
+.cache/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Dependencies
+vendor/
+
+# Test files
+*.out

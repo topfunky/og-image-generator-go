@@ -1,0 +1,58 @@
+version: 2
+
+project_name: og-image-generator
+
+before:
+  hooks:
+    - go mod tidy
+    - go test ./...
+
+builds:
+  - id: og-image-generator
+    main: .
+    binary: og-image-generator
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X main.version={{.Version}}
+
+archives:
+  - id: default
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - README.md
+      - LICENSE*
+
+checksum:
+  name_template: "checksums.txt"
+  algorithm: sha256
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+
+homebrew_casks:
+  - name: og-image-generator
+    repository:
+      owner: "{{ .Env.GITHUB_REPOSITORY_OWNER }}"
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    homepage: "https://github.com/{{ .Env.GITHUB_REPOSITORY }}"
+    description: "Generate Open Graph images from the command line"
+    url:
+      verified: "github.com/{{ .Env.GITHUB_REPOSITORY }}"
+    binaries:
+      - og-image-generator
+    skip_upload: auto
