@@ -4,11 +4,14 @@ A Go application for generating dynamic social share images (Open Graph images) 
 
 Based on the approach from [Mat Ryer's blog post](https://pace.dev/blog/2020/03/02/dynamically-generate-social-images-in-golang-by-mat-ryer.html) on programmatically generating beautiful social media images in Go.
 
+![OpenGraph social image](https://topfunky.com/2025/unrivaled-elo/og-image.out.png)
+
 ## Features
 
 - **Optimized Dimensions**: Generates 1200x628px images optimized for Twitter/Facebook (configurable)
 - **Text Rendering**: Displays article titles with text shadows for improved readability
 - **Visual Design**: Semi-transparent overlays and customizable background colors
+- **Automatic font sizing**: URLs of any length will be sized to fit the card dimensions
 - **Responsive Layout**: Text wrapping and positioning works across different image sizes
 - **System Font Fallback**: Automatically uses available system fonts if custom fonts aren't provided
 - **PNG Output**: Generates high-quality PNG files ready for web use
