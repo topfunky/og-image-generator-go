@@ -143,14 +143,14 @@ func drawTitle(dc *gg.Context, title, fontPath string, width int) error {
 	return nil
 }
 
-func drawURL(dc *gg.Context, url, fontPath string, width, height int) error {
+func drawURL(dc *gg.Context, url, fontPath string, _, height int) error {
 	if err := dc.LoadFontFace(fontPath, 40); err != nil {
 		return fmt.Errorf("load font for url: %w", err)
 	}
 
 	mutedColor := color.RGBA{R: 200, G: 200, B: 200, A: 220}
 	dc.SetColor(mutedColor)
-	urlY := float64(height) - 40.0
+	urlY := float64(height) - 70.0
 	dc.DrawString(url, 60.0, urlY)
 
 	return nil
