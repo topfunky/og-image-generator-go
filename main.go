@@ -19,22 +19,32 @@ var (
 func main() {
 	if err := run(); err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
-		os.Exit(1)
+		osExit(1)
 	}
 }
 
+// fontResolver is a function type for resolving font paths
+type fontResolver func(customFont string) (string, error)
+
+// defaultFontResolver is the default font resolver
+var defaultFontResolver fontResolver = resolveFontPath
+
 func run() error {
+	return runWithResolver(defaultFontResolver)
+}
+
+func runWithResolver(resolver fontResolver) error {
 	opts, err := parseFlags()
 	if err != nil {
 		return err
 	}
 
-	titleFontPath, err := resolveFontPath(opts.TitleFont)
+	titleFontPath, err := resolver(opts.TitleFont)
 	if err != nil {
 		return err
 	}
 
-	urlFontPath, err := resolveFontPath(opts.URLFont)
+	urlFontPath, err := resolver(opts.URLFont)
 	if err != nil {
 		return err
 	}
@@ -70,6 +80,12 @@ type Options struct {
 	URLFont   string
 }
 
+// ErrVersionRequested is returned when the -version flag is passed
+var ErrVersionRequested = fmt.Errorf("version requested")
+
+// osExit is a variable to allow testing of os.Exit calls
+var osExit = os.Exit
+
 func parseFlags() (*Options, error) {
 	title := flag.String("title", "", "Article title (required)")
 	url := flag.String("url", "", "Article URL (required)")
@@ -84,12 +100,9 @@ func parseFlags() (*Options, error) {
 	flag.Parse()
 
 	if *versionFlag {
-		versionStr := version
-		if versionStr == "dev" {
-			versionStr = commit
-		}
-		fmt.Println("og-image-generator version " + versionStr)
-		os.Exit(0)
+		fmt.Println("og-image-generator version " + getVersionString())
+		osExit(0)
+		return nil, ErrVersionRequested
 	}
 
 	if *title == "" || *url == "" {
@@ -109,7 +122,28 @@ func parseFlags() (*Options, error) {
 	}, nil
 }
 
+func getVersionString() string {
+	if version == "dev" {
+		return commit
+	}
+	return version
+}
+
+// defaultSystemFontPaths contains the default system font paths to search
+var defaultSystemFontPaths = []string{
+	"/System/Library/Fonts/SFCompact.ttf",
+	"/System/Library/Fonts/SFNSDisplay.ttf",
+	"/System/Library/Fonts/Arial.ttf",
+	"/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+	"/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+	"C:\\Windows\\Fonts\\arial.ttf",
+}
+
 func resolveFontPath(customFont string) (string, error) {
+	return resolveFontPathWithPaths(customFont, defaultSystemFontPaths)
+}
+
+func resolveFontPathWithPaths(customFont string, systemPaths []string) (string, error) {
 	if customFont != "" {
 		return customFont, nil
 	}
@@ -119,16 +153,7 @@ func resolveFontPath(customFont string) (string, error) {
 		return fontPath, nil
 	}
 
-	possiblePaths := []string{
-		"/System/Library/Fonts/SFCompact.ttf",
-		"/System/Library/Fonts/SFNSDisplay.ttf",
-		"/System/Library/Fonts/Arial.ttf",
-		"/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-		"/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
-		"C:\\Windows\\Fonts\\arial.ttf",
-	}
-
-	for _, p := range possiblePaths {
+	for _, p := range systemPaths {
 		if _, err := os.Stat(p); err == nil {
 			return p, nil
 		}
