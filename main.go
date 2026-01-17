@@ -214,6 +214,8 @@ func wrapText(dc *gg.Context, text string, maxWidth float64) []string {
 
 // preventOrphans checks if the last line has only one word and if so,
 // moves the last word from the previous line to create a more balanced layout.
+// After fixing an orphan, it also checks if the line before the modified line
+// can be balanced by moving a word down.
 func preventOrphans(lines []string) []string {
 	if len(lines) < 2 {
 		return lines
@@ -242,6 +244,59 @@ func preventOrphans(lines []string) []string {
 
 	lines[len(lines)-2] = newPrevLine
 	lines[len(lines)-1] = newLastLine
+
+	// Now check if we need to balance lines above the modified line
+	// Work backwards from the modified line (len(lines)-2)
+	lines = balanceLinesUpward(lines, len(lines)-2)
+
+	return lines
+}
+
+// balanceLinesUpward checks if the line at modifiedIdx can be balanced with the line above it.
+// If the line above ends with two words that both start after the length of the modified line,
+// move one word down to balance. This process continues upward as needed.
+func balanceLinesUpward(lines []string, modifiedIdx int) []string {
+	// Need at least a line above the modified line
+	if modifiedIdx < 1 {
+		return lines
+	}
+
+	for idx := modifiedIdx; idx >= 1; idx-- {
+		currentLine := lines[idx]
+		aboveLine := lines[idx-1]
+
+		currentLen := len(currentLine)
+		aboveWords := strings.Fields(aboveLine)
+
+		// Need at least 2 words in the line above to consider balancing
+		if len(aboveWords) < 2 {
+			continue
+		}
+
+		// Check if the last two words of the line above both start after the current line's length
+		// Build the line without the last word to find where the second-to-last word starts
+		lineWithoutLastWord := strings.Join(aboveWords[:len(aboveWords)-1], " ")
+		secondToLastWordStart := len(strings.Join(aboveWords[:len(aboveWords)-2], " "))
+		if len(aboveWords) > 2 {
+			secondToLastWordStart++ // account for space before the word
+		}
+
+		// If the second-to-last word starts at or after the current line's length,
+		// both trailing words are "hanging" past the current line, so move one down
+		if secondToLastWordStart >= currentLen {
+			// Move the last word from the line above to the current line
+			wordToMove := aboveWords[len(aboveWords)-1]
+			newAboveLine := lineWithoutLastWord
+			newCurrentLine := wordToMove + " " + currentLine
+
+			lines[idx-1] = newAboveLine
+			lines[idx] = newCurrentLine
+			// Continue checking upward since we modified line idx-1
+		} else {
+			// No balancing needed at this level, stop propagating
+			break
+		}
+	}
 
 	return lines
 }

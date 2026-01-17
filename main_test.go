@@ -943,6 +943,93 @@ func TestWrapTextOrphanPrevention(t *testing.T) {
 	}
 }
 
+func TestPreventOrphansLineBalancing(t *testing.T) {
+	// Test the improved orphan algorithm that balances lines when a word is moved.
+	// When a word is moved from line N to line N+1, we check if line N-1 ends with
+	// two words that both start after the length of line N. If so, we move one word
+	// down to balance the lines.
+	//
+	// Example scenario:
+	// Before orphan prevention:
+	//   Line 1: "The as via or"      (length ~X)
+	//   Line 2: "with can alt"       (length ~Y, shorter)
+	//   Line 3: "vip"                (orphan)
+	//
+	// After basic orphan prevention (move "alt" down):
+	//   Line 1: "The as via or"      (length ~X)
+	//   Line 2: "with can"           (length ~Z, now even shorter)
+	//   Line 3: "alt vip"            (no longer orphan)
+	//
+	// With improved balancing, we check if line 1 ends with two words ("via or")
+	// that both start after the length of line 2 ("with can"). If "via" starts
+	// after the end of "with can", we should move "or" down to balance:
+	//   Line 1: "The as via"
+	//   Line 2: "or with can"
+	//   Line 3: "alt vip"
+
+	tests := []struct {
+		name     string
+		input    []string
+		expected []string
+	}{
+		{
+			name: "balance lines when previous line has trailing short words",
+			// Line 1: "aaaa bb cc" is longer than line 2: "dd ee"
+			// After orphan fix: line 2 becomes "dd" and line 3 becomes "ee ff"
+			// Now line 1 ends with "bb cc" - check if "bb" starts after len("dd")
+			// If so, move "cc" down to balance
+			input:    []string{"aaaa bb cc", "dd ee", "ff"},
+			expected: []string{"aaaa bb", "cc dd", "ee ff"},
+		},
+		{
+			name: "no balancing needed when lines are already balanced",
+			input:    []string{"aaaa bbbb", "cccc dddd", "ee ff"},
+			expected: []string{"aaaa bbbb", "cccc dddd", "ee ff"},
+		},
+		{
+			name: "balance propagates up multiple lines",
+			// After orphan fix on line 3, line 2 becomes short, triggering balance from line 1
+			input:    []string{"aa bb cc dd", "ee ff gg", "hh"},
+			expected: []string{"aa bb cc", "dd ee ff", "gg hh"},
+		},
+		{
+			name:     "single line unchanged",
+			input:    []string{"hello world"},
+			expected: []string{"hello world"},
+		},
+		{
+			name:     "two lines no orphan unchanged",
+			input:    []string{"hello world", "foo bar"},
+			expected: []string{"hello world", "foo bar"},
+		},
+		{
+			name: "orphan fixed but no balancing needed",
+			// After orphan fix, line 1 doesn't have trailing words past line 2's length
+			input:    []string{"aa bb", "cc dd ee", "ff"},
+			expected: []string{"aa bb", "cc dd", "ee ff"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := preventOrphans(tt.input)
+
+			if len(result) != len(tt.expected) {
+				t.Errorf("preventOrphans() returned %d lines, want %d\ngot: %v\nwant: %v",
+					len(result), len(tt.expected), result, tt.expected)
+				return
+			}
+
+			for i := range result {
+				if result[i] != tt.expected[i] {
+					t.Errorf("preventOrphans()[%d] = %q, want %q\nfull result: %v",
+						i, result[i], tt.expected[i], result)
+				}
+			}
+		})
+	}
+}
+
 func TestMain(m *testing.M) {
 	// This runs all tests
 	os.Exit(m.Run())
