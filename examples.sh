@@ -17,6 +17,13 @@ echo "=== Example 1: Basic usage ==="
   -output out/social-image.png
 
 echo ""
+echo "=== Example 1 alt: Basic usage ==="
+./og-image-generator \
+  -title "Do first, and understand later" \
+  -url "https://example.com/go-apis" \
+  -output out/do-first-understand-later.png
+
+echo ""
 echo "=== Example 2: Custom output and background color ==="
 ./og-image-generator \
   -title "Mastering Concurrency in Go" \
