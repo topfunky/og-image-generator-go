@@ -42,5 +42,34 @@ echo "=== Example 4: Very long title (tests text wrapping) ==="
   -bg "#2c3e50"
 
 echo ""
+echo "=== Example 5: Orphan prevention - title that would end with single word ==="
+# Without orphan prevention, "Today" would appear alone on the last line
+# With orphan prevention, "Services Today" appears together
+./og-image-generator \
+  -title "Building High-Performance Web Services Today" \
+  -url "https://example.com/web-services" \
+  -output out/orphan-prevented.png \
+  -bg "#1e3a5f"
+
+echo ""
+echo "=== Example 6: Another orphan prevention example ==="
+# Without orphan prevention, "Go" would appear alone on the last line
+# With orphan prevention, "with Go" appears together
+./og-image-generator \
+  -title "Modern API Development with Go" \
+  -url "https://example.com/api-dev" \
+  -output out/orphan-prevented-2.png \
+  -bg "#2d3436"
+
+echo ""
+echo "=== Example 7: Three-line title with orphan prevention ==="
+# Tests orphan prevention when text wraps to three lines
+./og-image-generator \
+  -title "Understanding Distributed Systems and Building Reliable Microservices Architecture" \
+  -url "https://example.com/distributed" \
+  -output out/three-line-orphan.png \
+  -bg "#6c5ce7"
+
+echo ""
 echo "Generated images:"
 ls -lh out/*.png

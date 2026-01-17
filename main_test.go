@@ -754,6 +754,195 @@ func TestRunDrawURLError(t *testing.T) {
 	}
 }
 
+func TestPreventOrphans(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    []string
+		expected []string
+	}{
+		{
+			name:     "no lines",
+			input:    []string{},
+			expected: []string{},
+		},
+		{
+			name:     "single line",
+			input:    []string{"Hello World"},
+			expected: []string{"Hello World"},
+		},
+		{
+			name:     "two lines no orphan",
+			input:    []string{"Hello World", "Foo Bar"},
+			expected: []string{"Hello World", "Foo Bar"},
+		},
+		{
+			name:     "orphan on last line",
+			input:    []string{"Hello World Foo", "Bar"},
+			expected: []string{"Hello World", "Foo Bar"},
+		},
+		{
+			name:     "three lines with orphan",
+			input:    []string{"First Line Here", "Second Line Words", "Orphan"},
+			expected: []string{"First Line Here", "Second Line", "Words Orphan"},
+		},
+		{
+			name:     "previous line has only one word - cannot fix",
+			input:    []string{"Hello", "World"},
+			expected: []string{"Hello", "World"},
+		},
+		{
+			name:     "last line already has multiple words",
+			input:    []string{"Hello World", "Foo Bar Baz"},
+			expected: []string{"Hello World", "Foo Bar Baz"},
+		},
+		{
+			name:     "nil input",
+			input:    nil,
+			expected: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := preventOrphans(tt.input)
+
+			if len(result) != len(tt.expected) {
+				t.Errorf("preventOrphans() returned %d lines, want %d", len(result), len(tt.expected))
+				return
+			}
+
+			for i := range result {
+				if result[i] != tt.expected[i] {
+					t.Errorf("preventOrphans()[%d] = %q, want %q", i, result[i], tt.expected[i])
+				}
+			}
+		})
+	}
+}
+
+func TestWrapText(t *testing.T) {
+	fontPath := testFontPath(t)
+
+	tests := []struct {
+		name           string
+		text           string
+		maxWidth       float64
+		minLines       int // minimum expected lines
+		checkNoOrphans bool
+	}{
+		{
+			name:           "empty text",
+			text:           "",
+			maxWidth:       500,
+			minLines:       0,
+			checkNoOrphans: false,
+		},
+		{
+			name:           "single word",
+			text:           "Hello",
+			maxWidth:       500,
+			minLines:       1,
+			checkNoOrphans: false,
+		},
+		{
+			name:           "short text fits on one line",
+			text:           "Hello World",
+			maxWidth:       500,
+			minLines:       1,
+			checkNoOrphans: false,
+		},
+		{
+			name:           "text wraps to multiple lines",
+			text:           "This is a longer title that should wrap across multiple lines",
+			maxWidth:       300,
+			minLines:       2,
+			checkNoOrphans: true,
+		},
+		{
+			name:           "title ending with single word should not orphan",
+			text:           "Building High-Performance Web Services Today",
+			maxWidth:       400,
+			minLines:       2,
+			checkNoOrphans: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dc := gg.NewContext(1200, 628)
+			if err := dc.LoadFontFace(fontPath, 72); err != nil {
+				t.Fatalf("failed to load font: %v", err)
+			}
+
+			lines := wrapText(dc, tt.text, tt.maxWidth)
+
+			if len(lines) < tt.minLines {
+				t.Errorf("wrapText() returned %d lines, want at least %d", len(lines), tt.minLines)
+			}
+
+			if tt.checkNoOrphans && len(lines) >= 2 {
+				lastLine := lines[len(lines)-1]
+				words := strings.Fields(lastLine)
+				if len(words) == 1 {
+					// Check if previous line has only one word (unavoidable orphan)
+					prevLine := lines[len(lines)-2]
+					prevWords := strings.Fields(prevLine)
+					if len(prevWords) >= 2 {
+						t.Errorf("wrapText() created orphan: last line has only one word %q", lastLine)
+					}
+				}
+			}
+
+			// Verify all words are preserved
+			originalWords := strings.Fields(tt.text)
+			var resultWords []string
+			for _, line := range lines {
+				resultWords = append(resultWords, strings.Fields(line)...)
+			}
+
+			if len(originalWords) != len(resultWords) {
+				t.Errorf("wrapText() lost words: got %d, want %d", len(resultWords), len(originalWords))
+			}
+		})
+	}
+}
+
+func TestWrapTextOrphanPrevention(t *testing.T) {
+	fontPath := testFontPath(t)
+
+	// This test specifically verifies orphan prevention behavior
+	dc := gg.NewContext(1200, 628)
+	if err := dc.LoadFontFace(fontPath, 72); err != nil {
+		t.Fatalf("failed to load font: %v", err)
+	}
+
+	// Test with a title that would naturally create an orphan
+	// "Advanced Patterns for Building High-Performance Web Services"
+	// At certain widths, "Services" might end up alone on the last line
+	title := "Advanced Patterns for Building High-Performance Web Services"
+
+	// Use a width that would cause wrapping
+	lines := wrapText(dc, title, 600)
+
+	if len(lines) < 2 {
+		t.Skip("text did not wrap at this width, cannot test orphan prevention")
+	}
+
+	// Check that last line doesn't have a single word (unless unavoidable)
+	lastLine := lines[len(lines)-1]
+	lastWords := strings.Fields(lastLine)
+
+	if len(lastWords) == 1 {
+		// Verify this is unavoidable (previous line has only one word)
+		prevLine := lines[len(lines)-2]
+		prevWords := strings.Fields(prevLine)
+		if len(prevWords) >= 2 {
+			t.Errorf("orphan detected: last line %q has only one word, but previous line %q has %d words",
+				lastLine, prevLine, len(prevWords))
+		}
+	}
+}
+
 func TestMain(m *testing.M) {
 	// This runs all tests
 	os.Exit(m.Run())

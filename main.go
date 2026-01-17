@@ -173,20 +173,107 @@ func drawBackground(dc *gg.Context, bgColorStr string, width, height int) {
 	dc.Fill()
 }
 
+// wrapText wraps text to fit within maxWidth and prevents orphans.
+// An orphan is when the last line contains only one word.
+// If an orphan is detected, the last word from the previous line is moved
+// to the last line so the final line has at least two words.
+func wrapText(dc *gg.Context, text string, maxWidth float64) []string {
+	words := strings.Fields(text)
+	if len(words) == 0 {
+		return nil
+	}
+
+	var lines []string
+	var currentLine string
+
+	for _, word := range words {
+		testLine := currentLine
+		if testLine != "" {
+			testLine += " "
+		}
+		testLine += word
+
+		w, _ := dc.MeasureString(testLine)
+		if w > maxWidth && currentLine != "" {
+			lines = append(lines, currentLine)
+			currentLine = word
+		} else {
+			currentLine = testLine
+		}
+	}
+	if currentLine != "" {
+		lines = append(lines, currentLine)
+	}
+
+	// Prevent orphans: if last line has only one word and there's a previous line,
+	// move the last word from the previous line to the last line
+	lines = preventOrphans(lines)
+
+	return lines
+}
+
+// preventOrphans checks if the last line has only one word and if so,
+// moves the last word from the previous line to create a more balanced layout.
+func preventOrphans(lines []string) []string {
+	if len(lines) < 2 {
+		return lines
+	}
+
+	lastLine := lines[len(lines)-1]
+	lastLineWords := strings.Fields(lastLine)
+
+	// Only fix if last line has exactly one word (orphan)
+	if len(lastLineWords) != 1 {
+		return lines
+	}
+
+	prevLine := lines[len(lines)-2]
+	prevLineWords := strings.Fields(prevLine)
+
+	// Only move a word if the previous line has at least 2 words
+	if len(prevLineWords) < 2 {
+		return lines
+	}
+
+	// Move the last word from previous line to the last line
+	wordToMove := prevLineWords[len(prevLineWords)-1]
+	newPrevLine := strings.Join(prevLineWords[:len(prevLineWords)-1], " ")
+	newLastLine := wordToMove + " " + lastLine
+
+	lines[len(lines)-2] = newPrevLine
+	lines[len(lines)-1] = newLastLine
+
+	return lines
+}
+
 func drawTitle(dc *gg.Context, title, fontPath string, width int) error {
 	if err := dc.LoadFontFace(fontPath, 72); err != nil {
 		return fmt.Errorf("load font: %w", err)
 	}
 
-	dc.SetColor(color.Black)
 	textRightMargin := 60.0
 	textTopMargin := 90.0
 	maxWidth := float64(width) - (2 * textRightMargin)
+	lineSpacing := 1.5
 
-	dc.DrawStringWrapped(title, textRightMargin+2, textTopMargin+2, 0, 0, maxWidth, 1.5, gg.AlignLeft)
+	lines := wrapText(dc, title, maxWidth)
 
+	// Get font metrics for line height calculation
+	_, fontHeight := dc.MeasureString("Mg") // Use typical characters for height
+
+	// Draw shadow
+	dc.SetColor(color.Black)
+	for i, line := range lines {
+		y := textTopMargin + 2 + float64(i)*fontHeight*lineSpacing
+		dc.DrawString(line, textRightMargin+2, y)
+	}
+
+	// Draw text
 	dc.SetColor(color.White)
-	dc.DrawStringWrapped(title, textRightMargin, textTopMargin, 0, 0, maxWidth, 1.5, gg.AlignLeft)
+	for i, line := range lines {
+		y := textTopMargin + float64(i)*fontHeight*lineSpacing
+		dc.DrawString(line, textRightMargin, y)
+	}
 
 	return nil
 }
