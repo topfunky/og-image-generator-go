@@ -16,6 +16,25 @@ var (
 	commit  = "unknown"
 )
 
+// Typographic constants
+const (
+	// Font sizes
+	TitleFontSize = 72.0
+	URLFontSize   = 40.0
+	URLMinFontSize = 16.0
+
+	// Spacing and margins
+	TextTopMargin   = 90.0
+	TextSideMargin  = 60.0
+	LineSpacing     = 1.5
+	ShadowOffset    = 2.0
+
+	// Background
+	BackgroundMargin       = 20.0
+	BackgroundCornerRadius = 20.0
+	BackgroundOverlayAlpha = 100
+)
+
 func main() {
 	if err := run(); err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
@@ -59,13 +78,11 @@ func runWithResolver(resolver fontResolver) error {
 
 	if opts.Debug {
 		// Load font to get metrics for debug baselines
-		if err := dc.LoadFontFace(titleFontPath, 72); err != nil {
+		if err := dc.LoadFontFace(titleFontPath, TitleFontSize); err != nil {
 			return fmt.Errorf("load font for debug: %w", err)
 		}
 		_, fontHeight := dc.MeasureString("Mg")
-		textTopMargin := 90.0
-		lineSpacing := 1.5
-		drawDebugBaselines(dc, fontHeight, lineSpacing, textTopMargin, opts.Width, opts.Height)
+		drawDebugBaselines(dc, fontHeight, LineSpacing, TextTopMargin, opts.Width, opts.Height)
 	}
 
 	if err := drawURL(dc, opts.URL, urlFontPath, opts.Width, opts.Height); err != nil {
@@ -181,9 +198,8 @@ func drawBackground(dc *gg.Context, bgColorStr string, width, height int) {
 	dc.SetColor(bgRGB)
 	dc.Clear()
 
-	margin := 20.0
-	dc.SetColor(color.RGBA{0, 0, 0, 100})
-	drawRoundedTopRect(dc, margin, margin, float64(width)-(2*margin), float64(height)-(2*margin), 20.0)
+	dc.SetColor(color.RGBA{0, 0, 0, BackgroundOverlayAlpha})
+	drawRoundedTopRect(dc, BackgroundMargin, BackgroundMargin, float64(width)-(2*BackgroundMargin), float64(height)-(2*BackgroundMargin), BackgroundCornerRadius)
 	dc.Fill()
 }
 
@@ -335,14 +351,11 @@ func balanceLinesUpward(lines []string, modifiedIdx int) []string {
 }
 
 func drawTitle(dc *gg.Context, title, fontPath string, width int) error {
-	if err := dc.LoadFontFace(fontPath, 72); err != nil {
+	if err := dc.LoadFontFace(fontPath, TitleFontSize); err != nil {
 		return fmt.Errorf("load font: %w", err)
 	}
 
-	textRightMargin := 60.0
-	textTopMargin := 90.0
-	maxWidth := float64(width) - (2 * textRightMargin)
-	lineSpacing := 1.5
+	maxWidth := float64(width) - (2 * TextSideMargin)
 
 	lines := wrapText(dc, title, maxWidth)
 
@@ -353,26 +366,25 @@ func drawTitle(dc *gg.Context, title, fontPath string, width int) error {
 	// Draw shadow
 	dc.SetColor(color.Black)
 	for i, line := range lines {
-		y := textTopMargin + 2 + float64(i)*fontHeight*lineSpacing + verticalOffset
-		dc.DrawString(line, textRightMargin+2, y)
+		y := TextTopMargin + ShadowOffset + float64(i)*fontHeight*LineSpacing + verticalOffset
+		dc.DrawString(line, TextSideMargin+ShadowOffset, y)
 	}
 
 	// Draw text
 	dc.SetColor(color.White)
 	for i, line := range lines {
-		y := textTopMargin + float64(i)*fontHeight*lineSpacing + verticalOffset
-		dc.DrawString(line, textRightMargin, y)
+		y := TextTopMargin + float64(i)*fontHeight*LineSpacing + verticalOffset
+		dc.DrawString(line, TextSideMargin, y)
 	}
 
 	return nil
 }
 
 func drawURL(dc *gg.Context, url, fontPath string, width, height int) error {
-	maxWidth := float64(width) - 120.0
-	fontSize := 40.0
-	minFontSize := 16.0
+	maxWidth := float64(width) - (2 * TextSideMargin)
+	fontSize := URLFontSize
 
-	for fontSize >= minFontSize {
+	for fontSize >= URLMinFontSize {
 		if err := dc.LoadFontFace(fontPath, fontSize); err != nil {
 			return fmt.Errorf("load font for url: %w", err)
 		}
@@ -389,24 +401,21 @@ func drawURL(dc *gg.Context, url, fontPath string, width, height int) error {
 	dc.SetColor(mutedColor)
 
 	// Align URL to the typographic baseline grid established by the title
-	// Title uses: textTopMargin=90, fontHeight from 72pt, lineSpacing=1.5
 	// We need to temporarily load the title font to get its metrics
-	titleFontHeight := 72.0 * 1.2 // Approximate font height for 72pt (ascent + descent)
-	textTopMargin := 90.0
-	lineSpacing := 1.5
+	titleFontHeight := TitleFontSize * 1.2 // Approximate font height (ascent + descent)
 	verticalOffset := titleFontHeight
-	firstBaseline := textTopMargin + verticalOffset
+	firstBaseline := TextTopMargin + verticalOffset
 
 	// Find the baseline closest to the bottom of the image (with some margin)
-	targetY := float64(height) - 70.0
-	baselineInterval := titleFontHeight * lineSpacing
+	targetY := float64(height)
+	baselineInterval := titleFontHeight * LineSpacing
 
 	// Calculate which baseline number we're closest to
 	n := (targetY - firstBaseline) / baselineInterval
 	// Round to nearest baseline and go up one to ensure it's above the target
 	nearestBaseline := firstBaseline + float64(int(n))*baselineInterval
 
-	dc.DrawString(url, 60.0, nearestBaseline)
+	dc.DrawString(url, TextSideMargin, nearestBaseline)
 
 	return nil
 }
