@@ -57,6 +57,17 @@ func runWithResolver(resolver fontResolver) error {
 		return err
 	}
 
+	if opts.Debug {
+		// Load font to get metrics for debug baselines
+		if err := dc.LoadFontFace(titleFontPath, 72); err != nil {
+			return fmt.Errorf("load font for debug: %w", err)
+		}
+		_, fontHeight := dc.MeasureString("Mg")
+		textTopMargin := 90.0
+		lineSpacing := 1.5
+		drawDebugBaselines(dc, fontHeight, lineSpacing, textTopMargin, opts.Width, opts.Height)
+	}
+
 	if err := drawURL(dc, opts.URL, urlFontPath, opts.Width, opts.Height); err != nil {
 		return err
 	}
@@ -78,6 +89,7 @@ type Options struct {
 	BgColor   string
 	TitleFont string
 	URLFont   string
+	Debug     bool
 }
 
 // ErrVersionRequested is returned when the -version flag is passed
@@ -96,6 +108,7 @@ func parseFlags() (*Options, error) {
 	titleFont := flag.String("title-font", "", "Title font file path (TTF)")
 	urlFont := flag.String("url-font", "", "URL font file path (TTF)")
 	versionFlag := flag.Bool("version", false, "Print version and exit")
+	debug := flag.Bool("debug", false, "Draw debug baselines")
 
 	flag.Parse()
 
@@ -119,6 +132,7 @@ func parseFlags() (*Options, error) {
 		BgColor:   *bgColor,
 		TitleFont: *titleFont,
 		URLFont:   *urlFont,
+		Debug:     *debug,
 	}, nil
 }
 
@@ -377,6 +391,21 @@ func drawURL(dc *gg.Context, url, fontPath string, width, height int) error {
 	dc.DrawString(url, 60.0, urlY)
 
 	return nil
+}
+
+// drawDebugBaselines draws hairline red lines at each typographic baseline
+func drawDebugBaselines(dc *gg.Context, fontHeight, lineSpacing, textTopMargin float64, width, height int) {
+	dc.SetColor(color.RGBA{255, 0, 0, 255}) // Red
+	dc.SetLineWidth(1)                      // Hairline
+
+	verticalOffset := fontHeight
+	firstBaseline := textTopMargin + verticalOffset
+
+	// Draw baselines at each line height interval until we reach the bottom
+	for y := firstBaseline; y < float64(height); y += fontHeight * lineSpacing {
+		dc.DrawLine(0, y, float64(width), y)
+		dc.Stroke()
+	}
 }
 
 // hexToRGB converts hex color string to color.RGBA

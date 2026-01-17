@@ -66,6 +66,15 @@ echo "=== Example 4 short: Very long title with short words (tests text wrapping
   -bg "#cc00cc"
 
 echo ""
+echo "=== Example 4 debug: Activate debug mode ==="
+./og-image-generator \
+  -title "The as via or with can alt vip run task bib bit lip too lid not eql mut var let const" \
+  -url "https://example.com/advanced-patterns" \
+  -output out/debug-baselines.png \
+  -debug \
+  -bg "#00cccc"
+
+echo ""
 echo "=== Example 5: Orphan prevention - title that would end with single word ==="
 # Without orphan prevention, "Today" would appear alone on the last line
 # With orphan prevention, "Services Today" appears together

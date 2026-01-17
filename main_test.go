@@ -1035,6 +1035,150 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
+func TestDebugFlag(t *testing.T) {
+	t.Run("debug flag parsed correctly", func(t *testing.T) {
+		oldArgs := os.Args
+		defer func() { os.Args = oldArgs }()
+
+		os.Args = []string{
+			"og-image-generator",
+			"-title", "Test Title",
+			"-url", "https://example.com",
+			"-debug",
+		}
+		resetFlags()
+
+		opts, err := parseFlags()
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		if !opts.Debug {
+			t.Error("expected Debug to be true when -debug flag is passed")
+		}
+	})
+
+	t.Run("debug flag defaults to false", func(t *testing.T) {
+		oldArgs := os.Args
+		defer func() { os.Args = oldArgs }()
+
+		os.Args = []string{
+			"og-image-generator",
+			"-title", "Test Title",
+			"-url", "https://example.com",
+		}
+		resetFlags()
+
+		opts, err := parseFlags()
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		if opts.Debug {
+			t.Error("expected Debug to be false by default")
+		}
+	})
+}
+
+func TestDrawDebugBaselines(t *testing.T) {
+	fontPath := testFontPath(t)
+
+	t.Run("draws baseline at correct position", func(t *testing.T) {
+		dc := gg.NewContext(1200, 628)
+
+		// Load font to get proper metrics
+		if err := dc.LoadFontFace(fontPath, 72); err != nil {
+			t.Fatalf("failed to load font: %v", err)
+		}
+
+		textTopMargin := 90.0
+		lineSpacing := 1.5
+		_, fontHeight := dc.MeasureString("Mg")
+		verticalOffset := fontHeight
+
+		// Calculate expected first baseline position (same as drawTitle)
+		expectedFirstBaseline := textTopMargin + verticalOffset
+
+		// Draw debug baselines
+		drawDebugBaselines(dc, fontHeight, lineSpacing, textTopMargin, 1200, 628)
+
+		// Verify a red pixel exists at the baseline position
+		// Check at x=100 (middle of the line) and y=expectedFirstBaseline
+		img := dc.Image()
+		r, g, b, _ := img.At(100, int(expectedFirstBaseline)).RGBA()
+
+		// Red should be high, green and blue should be low
+		if r>>8 < 200 || g>>8 > 50 || b>>8 > 50 {
+			t.Errorf("expected red pixel at baseline y=%d, got RGBA(%d, %d, %d, _)",
+				int(expectedFirstBaseline), r>>8, g>>8, b>>8)
+		}
+	})
+
+	t.Run("draws multiple baselines at line height intervals", func(t *testing.T) {
+		dc := gg.NewContext(1200, 628)
+
+		if err := dc.LoadFontFace(fontPath, 72); err != nil {
+			t.Fatalf("failed to load font: %v", err)
+		}
+
+		textTopMargin := 90.0
+		lineSpacing := 1.5
+		_, fontHeight := dc.MeasureString("Mg")
+		verticalOffset := fontHeight
+
+		drawDebugBaselines(dc, fontHeight, lineSpacing, textTopMargin, 1200, 628)
+
+		img := dc.Image()
+
+		// Check first baseline
+		firstBaseline := textTopMargin + verticalOffset
+		r1, g1, b1, _ := img.At(100, int(firstBaseline)).RGBA()
+		if r1>>8 < 200 || g1>>8 > 50 || b1>>8 > 50 {
+			t.Errorf("expected red pixel at first baseline y=%d", int(firstBaseline))
+		}
+
+		// Check second baseline (one line height * spacing down)
+		secondBaseline := firstBaseline + fontHeight*lineSpacing
+		r2, g2, b2, _ := img.At(100, int(secondBaseline)).RGBA()
+		if r2>>8 < 200 || g2>>8 > 50 || b2>>8 > 50 {
+			t.Errorf("expected red pixel at second baseline y=%d", int(secondBaseline))
+		}
+	})
+}
+
+func TestRunWithDebugFlag(t *testing.T) {
+	fontPath := testFontPath(t)
+
+	t.Run("debug mode generates image with baselines", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		outputPath := filepath.Join(tmpDir, "debug-output.png")
+
+		oldArgs := os.Args
+		defer func() { os.Args = oldArgs }()
+
+		os.Args = []string{
+			"og-image-generator",
+			"-title", "Test Title",
+			"-url", "https://example.com",
+			"-output", outputPath,
+			"-title-font", fontPath,
+			"-url-font", fontPath,
+			"-debug",
+		}
+		resetFlags()
+
+		err := run()
+		if err != nil {
+			t.Errorf("run() unexpected error: %v", err)
+		}
+
+		// Verify output file was created
+		if _, err := os.Stat(outputPath); os.IsNotExist(err) {
+			t.Error("output file was not created")
+		}
+	})
+}
+
 func TestRunWithResolverTitleFontError(t *testing.T) {
 	oldArgs := os.Args
 	defer func() { os.Args = oldArgs }()
