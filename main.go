@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"image/color"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -423,14 +424,16 @@ func drawURL(dc *gg.Context, url, fontPath string, width, height int) error {
 // drawDebugBaselines draws hairline red lines at each typographic baseline
 func drawDebugBaselines(dc *gg.Context, fontHeight, lineSpacing, textTopMargin float64, width, height int) {
 	dc.SetColor(color.RGBA{255, 0, 0, 255}) // Red
-	dc.SetLineWidth(1)                      // Hairline
+	dc.SetLineWidth(2)                      // Visible line
 
 	verticalOffset := fontHeight
 	firstBaseline := textTopMargin + verticalOffset
 
 	// Draw baselines at each line height interval until we reach the bottom
 	for y := firstBaseline; y < float64(height); y += fontHeight * lineSpacing {
-		dc.DrawLine(0, y, float64(width), y)
+		// Round to nearest 0.5 to avoid anti-aliasing artifacts
+		roundedY := math.Round(y*2) / 2
+		dc.DrawLine(0, roundedY, float64(width), roundedY)
 		dc.Stroke()
 	}
 }
