@@ -387,8 +387,26 @@ func drawURL(dc *gg.Context, url, fontPath string, width, height int) error {
 
 	mutedColor := color.RGBA{R: 200, G: 200, B: 200, A: 220}
 	dc.SetColor(mutedColor)
-	urlY := float64(height) - 70.0
-	dc.DrawString(url, 60.0, urlY)
+
+	// Align URL to the typographic baseline grid established by the title
+	// Title uses: textTopMargin=90, fontHeight from 72pt, lineSpacing=1.5
+	// We need to temporarily load the title font to get its metrics
+	titleFontHeight := 72.0 * 1.2 // Approximate font height for 72pt (ascent + descent)
+	textTopMargin := 90.0
+	lineSpacing := 1.5
+	verticalOffset := titleFontHeight
+	firstBaseline := textTopMargin + verticalOffset
+
+	// Find the baseline closest to the bottom of the image (with some margin)
+	targetY := float64(height) - 70.0
+	baselineInterval := titleFontHeight * lineSpacing
+
+	// Calculate which baseline number we're closest to
+	n := (targetY - firstBaseline) / baselineInterval
+	// Round to nearest baseline and go up one to ensure it's above the target
+	nearestBaseline := firstBaseline + float64(int(n))*baselineInterval
+
+	dc.DrawString(url, 60.0, nearestBaseline)
 
 	return nil
 }
