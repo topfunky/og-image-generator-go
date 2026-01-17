@@ -1,4 +1,4 @@
-.PHONY: help build clean test run install fmt lint
+.PHONY: help build clean test coverage run install fmt lint
 
 # Default target
 help:
@@ -6,6 +6,7 @@ help:
 	@echo "  build       - Build the application"
 	@echo "  clean       - Remove build artifacts and test outputs"
 	@echo "  test        - Run tests"
+	@echo "  coverage    - Run tests with coverage and show HTML report"
 	@echo "  run         - Build and run with example arguments"
 	@echo "  install     - Build and install binary to GOPATH"
 	@echo "  fmt         - Format code with gofmt"
@@ -20,11 +21,19 @@ build:
 clean:
 	rm -f og-image-generator
 	rm -f test*.png example-*.png dark-image.png wide-image.png long-title.png final-test.png social-image.png
+	rm -f coverage.out coverage.html
 	go clean
 
 # Run tests
 test:
 	go test -v ./...
+
+# Run tests with coverage and show HTML report
+coverage:
+	go test -coverprofile=coverage.out ./...
+	go tool cover -html=coverage.out -o coverage.html
+	@echo "Coverage report generated: coverage.html"
+	@go tool cover -func=coverage.out | tail -1
 
 # Run with example
 run: build

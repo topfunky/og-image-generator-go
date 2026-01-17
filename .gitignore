@@ -17,6 +17,7 @@ wide-image.png
 long-title.png
 social-image.png
 *.png
+coverage.html
 
 # Go build cache
 .cache/
