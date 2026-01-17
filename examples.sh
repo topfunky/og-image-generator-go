@@ -41,6 +41,23 @@ echo "=== Example 4: Very long title (tests text wrapping) ==="
   -output out/long-title.png \
   -bg "#2c3e50"
 
+
+echo ""
+echo "=== Example 4 alt: Very long title alt (tests text wrapping) ==="
+./og-image-generator \
+  -title "Advanced Patterns for Building High Performance, Scalable, and Maintainable Web Services with Go" \
+  -url "https://example.com/advanced-patterns" \
+  -output out/long-title-alt.png \
+  -bg "#cccc00"
+
+echo ""
+echo "=== Example 4 short: Very long title with short words (tests text wrapping) ==="
+./og-image-generator \
+  -title "The as via or with can alt vip run task bib bit lip too lid not eql mut var let const" \
+  -url "https://example.com/advanced-patterns" \
+  -output out/short-words.png \
+  -bg "#cc00cc"
+
 echo ""
 echo "=== Example 5: Orphan prevention - title that would end with single word ==="
 # Without orphan prevention, "Today" would appear alone on the last line
