@@ -19,22 +19,32 @@ var (
 func main() {
 	if err := run(); err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
-		os.Exit(1)
+		osExit(1)
 	}
 }
 
+// fontResolver is a function type for resolving font paths
+type fontResolver func(customFont string) (string, error)
+
+// defaultFontResolver is the default font resolver
+var defaultFontResolver fontResolver = resolveFontPath
+
 func run() error {
+	return runWithResolver(defaultFontResolver)
+}
+
+func runWithResolver(resolver fontResolver) error {
 	opts, err := parseFlags()
 	if err != nil {
 		return err
 	}
 
-	titleFontPath, err := resolveFontPath(opts.TitleFont)
+	titleFontPath, err := resolver(opts.TitleFont)
 	if err != nil {
 		return err
 	}
 
-	urlFontPath, err := resolveFontPath(opts.URLFont)
+	urlFontPath, err := resolver(opts.URLFont)
 	if err != nil {
 		return err
 	}
@@ -70,6 +80,12 @@ type Options struct {
 	URLFont   string
 }
 
+// ErrVersionRequested is returned when the -version flag is passed
+var ErrVersionRequested = fmt.Errorf("version requested")
+
+// osExit is a variable to allow testing of os.Exit calls
+var osExit = os.Exit
+
 func parseFlags() (*Options, error) {
 	title := flag.String("title", "", "Article title (required)")
 	url := flag.String("url", "", "Article URL (required)")
@@ -84,12 +100,9 @@ func parseFlags() (*Options, error) {
 	flag.Parse()
 
 	if *versionFlag {
-		versionStr := version
-		if versionStr == "dev" {
-			versionStr = commit
-		}
-		fmt.Println("og-image-generator version " + versionStr)
-		os.Exit(0)
+		fmt.Println("og-image-generator version " + getVersionString())
+		osExit(0)
+		return nil, ErrVersionRequested
 	}
 
 	if *title == "" || *url == "" {
@@ -109,7 +122,28 @@ func parseFlags() (*Options, error) {
 	}, nil
 }
 
+func getVersionString() string {
+	if version == "dev" {
+		return commit
+	}
+	return version
+}
+
+// defaultSystemFontPaths contains the default system font paths to search
+var defaultSystemFontPaths = []string{
+	"/System/Library/Fonts/SFCompact.ttf",
+	"/System/Library/Fonts/SFNSDisplay.ttf",
+	"/System/Library/Fonts/Arial.ttf",
+	"/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+	"/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
+	"C:\\Windows\\Fonts\\arial.ttf",
+}
+
 func resolveFontPath(customFont string) (string, error) {
+	return resolveFontPathWithPaths(customFont, defaultSystemFontPaths)
+}
+
+func resolveFontPathWithPaths(customFont string, systemPaths []string) (string, error) {
 	if customFont != "" {
 		return customFont, nil
 	}
@@ -119,16 +153,7 @@ func resolveFontPath(customFont string) (string, error) {
 		return fontPath, nil
 	}
 
-	possiblePaths := []string{
-		"/System/Library/Fonts/SFCompact.ttf",
-		"/System/Library/Fonts/SFNSDisplay.ttf",
-		"/System/Library/Fonts/Arial.ttf",
-		"/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-		"/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
-		"C:\\Windows\\Fonts\\arial.ttf",
-	}
-
-	for _, p := range possiblePaths {
+	for _, p := range systemPaths {
 		if _, err := os.Stat(p); err == nil {
 			return p, nil
 		}
@@ -148,20 +173,162 @@ func drawBackground(dc *gg.Context, bgColorStr string, width, height int) {
 	dc.Fill()
 }
 
+// wrapText wraps text to fit within maxWidth and prevents orphans.
+// An orphan is when the last line contains only one word.
+// If an orphan is detected, the last word from the previous line is moved
+// to the last line so the final line has at least two words.
+func wrapText(dc *gg.Context, text string, maxWidth float64) []string {
+	words := strings.Fields(text)
+	if len(words) == 0 {
+		return nil
+	}
+
+	var lines []string
+	var currentLine string
+
+	for _, word := range words {
+		testLine := currentLine
+		if testLine != "" {
+			testLine += " "
+		}
+		testLine += word
+
+		w, _ := dc.MeasureString(testLine)
+		if w > maxWidth && currentLine != "" {
+			lines = append(lines, currentLine)
+			currentLine = word
+		} else {
+			currentLine = testLine
+		}
+	}
+	if currentLine != "" {
+		lines = append(lines, currentLine)
+	}
+
+	// Prevent orphans: if last line has only one word and there's a previous line,
+	// move the last word from the previous line to the last line
+	lines = preventOrphans(lines)
+
+	return lines
+}
+
+// preventOrphans checks if the last line has only one word and if so,
+// moves the last word from the previous line to create a more balanced layout.
+// After fixing an orphan, it also checks if the line before the modified line
+// can be balanced by moving a word down.
+func preventOrphans(lines []string) []string {
+	if len(lines) < 2 {
+		return lines
+	}
+
+	lastLine := lines[len(lines)-1]
+	lastLineWords := strings.Fields(lastLine)
+
+	// Only fix if last line has exactly one word (orphan)
+	if len(lastLineWords) != 1 {
+		return lines
+	}
+
+	prevLine := lines[len(lines)-2]
+	prevLineWords := strings.Fields(prevLine)
+
+	// Only move a word if the previous line has at least 2 words
+	if len(prevLineWords) < 2 {
+		return lines
+	}
+
+	// Move the last word from previous line to the last line
+	wordToMove := prevLineWords[len(prevLineWords)-1]
+	newPrevLine := strings.Join(prevLineWords[:len(prevLineWords)-1], " ")
+	newLastLine := wordToMove + " " + lastLine
+
+	lines[len(lines)-2] = newPrevLine
+	lines[len(lines)-1] = newLastLine
+
+	// Now check if we need to balance lines above the modified line
+	// Work backwards from the modified line (len(lines)-2)
+	lines = balanceLinesUpward(lines, len(lines)-2)
+
+	return lines
+}
+
+// balanceLinesUpward checks if the line at modifiedIdx can be balanced with the line above it.
+// If the line above ends with two words that both start after the length of the modified line,
+// move one word down to balance. This process continues upward as needed.
+func balanceLinesUpward(lines []string, modifiedIdx int) []string {
+	// Need at least a line above the modified line
+	if modifiedIdx < 1 {
+		return lines
+	}
+
+	for idx := modifiedIdx; idx >= 1; idx-- {
+		currentLine := lines[idx]
+		aboveLine := lines[idx-1]
+
+		currentLen := len(currentLine)
+		aboveWords := strings.Fields(aboveLine)
+
+		// Need at least 2 words in the line above to consider balancing
+		if len(aboveWords) < 2 {
+			continue
+		}
+
+		// Check if the last two words of the line above both start after the current line's length
+		// Build the line without the last word to find where the second-to-last word starts
+		lineWithoutLastWord := strings.Join(aboveWords[:len(aboveWords)-1], " ")
+		secondToLastWordStart := len(strings.Join(aboveWords[:len(aboveWords)-2], " "))
+		if len(aboveWords) > 2 {
+			secondToLastWordStart++ // account for space before the word
+		}
+
+		// If the second-to-last word starts at or after the current line's length,
+		// both trailing words are "hanging" past the current line, so move one down
+		if secondToLastWordStart >= currentLen {
+			// Move the last word from the line above to the current line
+			wordToMove := aboveWords[len(aboveWords)-1]
+			newAboveLine := lineWithoutLastWord
+			newCurrentLine := wordToMove + " " + currentLine
+
+			lines[idx-1] = newAboveLine
+			lines[idx] = newCurrentLine
+			// Continue checking upward since we modified line idx-1
+		} else {
+			// No balancing needed at this level, stop propagating
+			break
+		}
+	}
+
+	return lines
+}
+
 func drawTitle(dc *gg.Context, title, fontPath string, width int) error {
 	if err := dc.LoadFontFace(fontPath, 72); err != nil {
 		return fmt.Errorf("load font: %w", err)
 	}
 
-	dc.SetColor(color.Black)
 	textRightMargin := 60.0
 	textTopMargin := 90.0
 	maxWidth := float64(width) - (2 * textRightMargin)
+	lineSpacing := 1.5
 
-	dc.DrawStringWrapped(title, textRightMargin+2, textTopMargin+2, 0, 0, maxWidth, 1.5, gg.AlignLeft)
+	lines := wrapText(dc, title, maxWidth)
 
+	// Get font metrics for line height calculation
+	_, fontHeight := dc.MeasureString("Mg") // Use typical characters for height
+
+	// Draw shadow
+	dc.SetColor(color.Black)
+	for i, line := range lines {
+		y := textTopMargin + 2 + float64(i)*fontHeight*lineSpacing
+		dc.DrawString(line, textRightMargin+2, y)
+	}
+
+	// Draw text
 	dc.SetColor(color.White)
-	dc.DrawStringWrapped(title, textRightMargin, textTopMargin, 0, 0, maxWidth, 1.5, gg.AlignLeft)
+	for i, line := range lines {
+		y := textTopMargin + float64(i)*fontHeight*lineSpacing
+		dc.DrawString(line, textRightMargin, y)
+	}
 
 	return nil
 }

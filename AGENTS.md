@@ -69,6 +69,17 @@ refactor: simplify hex color parsing
 Extract hexToRGB into separate utility function.
 ```
 
+### Test-Driven Development
+
+Follow **TDD (Red-Green-Refactor)** for all changes:
+
+1. **Red**: Write a failing test first
+2. **Verify**: Run the test to confirm it fails
+3. **Green**: Write the minimum implementation to pass the test
+4. **Refactor**: Clean up code while keeping tests green
+
+Do not skip the verification step - always confirm the test fails before implementing.
+
 ### Atomic Commits
 
 - Make one logical change per commit
