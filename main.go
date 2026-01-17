@@ -169,8 +169,27 @@ func drawBackground(dc *gg.Context, bgColorStr string, width, height int) {
 
 	margin := 20.0
 	dc.SetColor(color.RGBA{0, 0, 0, 100})
-	dc.DrawRectangle(margin, margin, float64(width)-(2*margin), float64(height)-(2*margin))
+	drawRoundedTopRect(dc, margin, margin, float64(width)-(2*margin), float64(height)-(2*margin), 20.0)
 	dc.Fill()
+}
+
+// drawRoundedTopRect draws a rectangle with rounded corners on top and square corners on bottom
+func drawRoundedTopRect(dc *gg.Context, x, y, w, h, radius float64) {
+	// Start at bottom-left corner (square)
+	dc.MoveTo(x, y+h)
+	// Line to bottom-right corner (square)
+	dc.LineTo(x+w, y+h)
+	// Line up to where top-right curve starts
+	dc.LineTo(x+w, y+radius)
+	// Top-right rounded corner
+	dc.DrawArc(x+w-radius, y+radius, radius, 0, -gg.Radians(90))
+	// Line to where top-left curve starts
+	dc.LineTo(x+radius, y)
+	// Top-left rounded corner
+	dc.DrawArc(x+radius, y+radius, radius, gg.Radians(270), gg.Radians(180))
+	// Close path back to bottom-left
+	dc.LineTo(x, y+h)
+	dc.ClosePath()
 }
 
 // wrapText wraps text to fit within maxWidth and prevents orphans.
