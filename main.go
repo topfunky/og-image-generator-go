@@ -334,18 +334,19 @@ func drawTitle(dc *gg.Context, title, fontPath string, width int) error {
 
 	// Get font metrics for line height calculation
 	_, fontHeight := dc.MeasureString("Mg") // Use typical characters for height
+	verticalOffset := fontHeight
 
 	// Draw shadow
 	dc.SetColor(color.Black)
 	for i, line := range lines {
-		y := textTopMargin + 2 + float64(i)*fontHeight*lineSpacing
+		y := textTopMargin + 2 + float64(i)*fontHeight*lineSpacing + verticalOffset
 		dc.DrawString(line, textRightMargin+2, y)
 	}
 
 	// Draw text
 	dc.SetColor(color.White)
 	for i, line := range lines {
-		y := textTopMargin + float64(i)*fontHeight*lineSpacing
+		y := textTopMargin + float64(i)*fontHeight*lineSpacing + verticalOffset
 		dc.DrawString(line, textRightMargin, y)
 	}
 
