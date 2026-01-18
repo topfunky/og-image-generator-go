@@ -4,7 +4,7 @@ A Go application for generating dynamic social share images (Open Graph images) 
 
 Based on the approach from [Mat Ryer's blog post](https://pace.dev/blog/2020/03/02/dynamically-generate-social-images-in-golang-by-mat-ryer.html) on programmatically generating beautiful social media images in Go.
 
-![OpenGraph social image](https://topfunky.com/2025/unrivaled-elo/og-image.out.png)
+![OpenGraph social image](https://topfunky.com/2026/easy-tools-you-should-use/og-image.out.png)
 
 ## Features
 
