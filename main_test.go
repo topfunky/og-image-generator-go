@@ -19,6 +19,7 @@ func testFontPath(t *testing.T) string {
 		"/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
 		"/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
 		"/System/Library/Fonts/Arial.ttf",
+		"/System/Library/Fonts/Supplemental/Arial.ttf",
 		"C:\\Windows\\Fonts\\arial.ttf",
 	}
 	for _, p := range paths {
@@ -286,6 +287,91 @@ func TestDrawURL(t *testing.T) {
 			t.Errorf("expected 'load font' error, got: %v", err)
 		}
 	})
+}
+
+func TestDrawURLPositionDynamic(t *testing.T) {
+	fontPath := testFontPath(t)
+
+	// Test that URL is positioned dynamically based on image height
+	// and sits on the baseline grid established by the title font
+	tests := []struct {
+		name   string
+		height int
+	}{
+		{"standard height", 628},
+		{"short height", 400},
+		{"tall height", 1080},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dc := gg.NewContext(1200, tt.height)
+			err := drawURL(dc, "https://example.com/article", fontPath, fontPath, 1200, tt.height)
+			if err != nil {
+				t.Fatalf("drawURL() error: %v", err)
+			}
+
+			// Load title font to calculate the baseline grid
+			if err := dc.LoadFontFace(fontPath, TitleFontSize); err != nil {
+				t.Fatalf("failed to load font: %v", err)
+			}
+			titleFontHeight := measureFontHeight(dc)
+
+			// Calculate the baseline grid
+			firstBaseline := TextTopMargin + titleFontHeight
+			baselineStep := titleFontHeight * LineSpacing
+			maxY := float64(tt.height) - BackgroundMargin
+
+			// Find the last baseline that fits
+			expectedY := firstBaseline
+			for y := firstBaseline; y <= maxY; y += baselineStep {
+				expectedY = y
+			}
+
+			// Verify the URL baseline is within bounds
+			if expectedY > maxY {
+				t.Errorf("URL baseline %f exceeds max allowed Y %f", expectedY, maxY)
+			}
+
+			// Verify the baseline is on the grid (should be firstBaseline + n*baselineStep)
+			stepsFromFirst := (expectedY - firstBaseline) / baselineStep
+			if stepsFromFirst < 0 {
+				t.Errorf("URL baseline is before first baseline")
+			}
+
+			// The URL should be visible - check for non-background pixels
+			img := dc.Image()
+
+			// Check around the expected baseline position
+			foundURLPixels := false
+			searchStart := int(expectedY) - 30
+			if searchStart < 0 {
+				searchStart = 0
+			}
+			searchEnd := int(expectedY) + 10
+			if searchEnd > tt.height {
+				searchEnd = tt.height
+			}
+
+			for y := searchStart; y < searchEnd; y++ {
+				for x := int(TextSideMargin); x < 400; x++ {
+					r, g, b, a := img.At(x, y).RGBA()
+					// Look for non-transparent, non-black pixels (the muted text color)
+					if a > 0 && (r > 0 || g > 0 || b > 0) {
+						foundURLPixels = true
+						break
+					}
+				}
+				if foundURLPixels {
+					break
+				}
+			}
+
+			if !foundURLPixels {
+				t.Errorf("URL text not found near expected baseline %f (height=%d)", expectedY, tt.height)
+			}
+		})
+	}
 }
 
 func TestRun(t *testing.T) {

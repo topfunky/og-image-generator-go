@@ -383,7 +383,7 @@ func drawTitle(dc *gg.Context, title, fontPath string, width int) error {
 	return nil
 }
 
-func drawURL(dc *gg.Context, url, titleFontPath string, urlFontPath string, width, height int) error {
+func drawURL(dc *gg.Context, url string, titleFontPath string, urlFontPath string, width, height int) error {
 	maxWidth := float64(width) - (2 * TextSideMargin)
 
 	// Find the appropriate font size that fits the URL
@@ -407,14 +407,24 @@ func drawURL(dc *gg.Context, url, titleFontPath string, urlFontPath string, widt
 
 	dc.SetColor(mutedTextColor)
 
-	// Get title font metrics for baseline alignment
+	// Calculate the baseline grid using the title font metrics
 	titleFontHeight, err := getFontHeight(titleFontPath, TitleFontSize, width, height)
 	if err != nil {
-		return fmt.Errorf("load font for baseline: %w", err)
+		return fmt.Errorf("load title font for baseline: %w", err)
 	}
 
-	// Align URL to the typographic baseline grid established by the title
-	targetY := TextTopMargin + titleFontHeight + (titleFontHeight*LineSpacing)*5
+	// Find the last baseline that fits within the image bounds
+	// The baseline grid starts at TextTopMargin + titleFontHeight (first baseline)
+	// and increments by titleFontHeight * LineSpacing
+	firstBaseline := TextTopMargin + titleFontHeight
+	baselineStep := titleFontHeight * LineSpacing
+	maxY := float64(height) - BackgroundMargin
+
+	// Find the last baseline that doesn't exceed the bottom margin
+	targetY := firstBaseline
+	for y := firstBaseline; y <= maxY; y += baselineStep {
+		targetY = y
+	}
 
 	dc.DrawString(url, TextSideMargin, targetY)
 

@@ -19,7 +19,7 @@ echo "=== Example 1: Basic usage ==="
 echo ""
 echo "=== Example 1 alt: Basic usage ==="
 ./og-image-generator \
-  -title "Do first, and understand later" \
+  -title "Do first, and then understand later" \
   -url "https://example.com/go-apis" \
   -output out/do-first-understand-later.png
 
