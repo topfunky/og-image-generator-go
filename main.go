@@ -20,15 +20,15 @@ var (
 // Typographic constants
 const (
 	// Font sizes
-	TitleFontSize = 72.0
-	URLFontSize   = 40.0
+	TitleFontSize  = 72.0
+	URLFontSize    = 40.0
 	URLMinFontSize = 16.0
 
 	// Spacing and margins
-	TextTopMargin   = 90.0
-	TextSideMargin  = 60.0
-	LineSpacing     = 1.5
-	ShadowOffset    = 2.0
+	TextTopMargin  = 90.0
+	TextSideMargin = 60.0
+	LineSpacing    = 1.5
+	ShadowOffset   = 2.0
 
 	// Background
 	BackgroundMargin       = 20.0
@@ -381,7 +381,7 @@ func drawTitle(dc *gg.Context, title, fontPath string, width int) error {
 	return nil
 }
 
-func drawURL(dc *gg.Context, url, fontPath string, width, height int) error {
+func drawURL(dc *gg.Context, url, fontPath string, width, _ int) error {
 	maxWidth := float64(width) - (2 * TextSideMargin)
 	fontSize := URLFontSize
 
@@ -403,20 +403,13 @@ func drawURL(dc *gg.Context, url, fontPath string, width, height int) error {
 
 	// Align URL to the typographic baseline grid established by the title
 	// We need to temporarily load the title font to get its metrics
-	titleFontHeight := TitleFontSize * 1.2 // Approximate font height (ascent + descent)
-	verticalOffset := titleFontHeight
-	firstBaseline := TextTopMargin + verticalOffset
+	// titleFontHeight := TitleFontSize * LineSpacing
 
 	// Find the baseline closest to the bottom of the image (with some margin)
-	targetY := float64(height)
-	baselineInterval := titleFontHeight * LineSpacing
+	// targetY := TextTopMargin + TitleFontSize + titleFontHeight*4
+	targetY := TextTopMargin + TitleFontSize + (TitleFontSize)*2
 
-	// Calculate which baseline number we're closest to
-	n := (targetY - firstBaseline) / baselineInterval
-	// Round to nearest baseline and go up one to ensure it's above the target
-	nearestBaseline := firstBaseline + float64(int(n))*baselineInterval
-
-	dc.DrawString(url, TextSideMargin, nearestBaseline)
+	dc.DrawString(url, TextSideMargin, targetY)
 
 	return nil
 }
@@ -428,6 +421,10 @@ func drawDebugBaselines(dc *gg.Context, fontHeight, lineSpacing, textTopMargin f
 
 	verticalOffset := fontHeight
 	firstBaseline := textTopMargin + verticalOffset
+
+	// Draw top margin line
+	dc.DrawLine(0, textTopMargin, float64(width), textTopMargin)
+	dc.Stroke()
 
 	// Draw baselines at each line height interval until we reach the bottom
 	for y := firstBaseline; y < float64(height); y += fontHeight * lineSpacing {
