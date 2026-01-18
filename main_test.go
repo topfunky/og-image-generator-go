@@ -249,7 +249,8 @@ func TestDrawTitle(t *testing.T) {
 }
 
 func TestDrawURL(t *testing.T) {
-	fontPath := testFontPath(t)
+	titleFontPath := testFontPath(t)
+	urlFontPath := testFontPath(t)
 
 	tests := []struct {
 		name    string
@@ -268,7 +269,7 @@ func TestDrawURL(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			dc := gg.NewContext(tt.width, tt.height)
-			err := drawURL(dc, tt.url, fontPath, tt.width, tt.height)
+			err := drawURL(dc, tt.url, titleFontPath, urlFontPath, tt.width, tt.height)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("drawURL() error = %v, wantErr %v", err, tt.wantErr)
 			}
@@ -277,7 +278,7 @@ func TestDrawURL(t *testing.T) {
 
 	t.Run("invalid font path", func(t *testing.T) {
 		dc := gg.NewContext(1200, 628)
-		err := drawURL(dc, "https://example.com", "/nonexistent/font.ttf", 1200, 628)
+		err := drawURL(dc, "https://example.com", "/nonexistent/title-font.ttf", "/nonexistent/font.ttf", 1200, 628)
 		if err == nil {
 			t.Error("expected error for invalid font path")
 		}
@@ -982,7 +983,7 @@ func TestPreventOrphansLineBalancing(t *testing.T) {
 			expected: []string{"aaaa bb", "cc dd", "ee ff"},
 		},
 		{
-			name: "no balancing needed when lines are already balanced",
+			name:     "no balancing needed when lines are already balanced",
 			input:    []string{"aaaa bbbb", "cccc dddd", "ee ff"},
 			expected: []string{"aaaa bbbb", "cccc dddd", "ee ff"},
 		},

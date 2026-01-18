@@ -82,11 +82,11 @@ func runWithResolver(resolver fontResolver) error {
 		if err := dc.LoadFontFace(titleFontPath, TitleFontSize); err != nil {
 			return fmt.Errorf("load font for debug: %w", err)
 		}
-		_, fontHeight := dc.MeasureString("Mg")
+		fontHeight := measureFontHeight(dc)
 		drawDebugBaselines(dc, fontHeight, LineSpacing, TextTopMargin, opts.Width, opts.Height)
 	}
 
-	if err := drawURL(dc, opts.URL, urlFontPath, opts.Width, opts.Height); err != nil {
+	if err := drawURL(dc, opts.URL, titleFontPath, urlFontPath, opts.Width, opts.Height); err != nil {
 		return err
 	}
 
@@ -361,7 +361,7 @@ func drawTitle(dc *gg.Context, title, fontPath string, width int) error {
 	lines := wrapText(dc, title, maxWidth)
 
 	// Get font metrics for line height calculation
-	_, fontHeight := dc.MeasureString("Mg") // Use typical characters for height
+	fontHeight := measureFontHeight(dc)
 	verticalOffset := fontHeight
 
 	// Draw shadow
@@ -381,12 +381,11 @@ func drawTitle(dc *gg.Context, title, fontPath string, width int) error {
 	return nil
 }
 
-func drawURL(dc *gg.Context, url, fontPath string, width, _ int) error {
+func drawURL(dc *gg.Context, url, titleFontPath string, urlFontPath string, width, height int) error {
 	maxWidth := float64(width) - (2 * TextSideMargin)
-	fontSize := URLFontSize
-
-	for fontSize >= URLMinFontSize {
-		if err := dc.LoadFontFace(fontPath, fontSize); err != nil {
+	urlFontSize := URLFontSize
+	for urlFontSize >= URLMinFontSize {
+		if err := dc.LoadFontFace(urlFontPath, URLFontSize); err != nil {
 			return fmt.Errorf("load font for url: %w", err)
 		}
 
@@ -395,7 +394,7 @@ func drawURL(dc *gg.Context, url, fontPath string, width, _ int) error {
 			break
 		}
 
-		fontSize -= 2.0
+		urlFontSize -= 2.0
 	}
 
 	mutedColor := color.RGBA{R: 200, G: 200, B: 200, A: 220}
@@ -403,11 +402,15 @@ func drawURL(dc *gg.Context, url, fontPath string, width, _ int) error {
 
 	// Align URL to the typographic baseline grid established by the title
 	// We need to temporarily load the title font to get its metrics
-	// titleFontHeight := TitleFontSize * LineSpacing
+	titleDc := gg.NewContext(width, height)
+	if err := titleDc.LoadFontFace(titleFontPath, TitleFontSize); err != nil {
+		return fmt.Errorf("load font for debug: %w", err)
+	}
+	titleFontSize := measureFontHeight(titleDc)
 
 	// Find the baseline closest to the bottom of the image (with some margin)
 	// targetY := TextTopMargin + TitleFontSize + titleFontHeight*4
-	targetY := TextTopMargin + TitleFontSize + (TitleFontSize)*2
+	targetY := TextTopMargin + titleFontSize + (titleFontSize*LineSpacing)*5
 
 	dc.DrawString(url, TextSideMargin, targetY)
 
@@ -419,8 +422,7 @@ func drawDebugBaselines(dc *gg.Context, fontHeight, lineSpacing, textTopMargin f
 	dc.SetColor(color.RGBA{255, 0, 0, 255}) // Red
 	dc.SetLineWidth(2)                      // Visible line
 
-	verticalOffset := fontHeight
-	firstBaseline := textTopMargin + verticalOffset
+	firstBaseline := textTopMargin + fontHeight
 
 	// Draw top margin line
 	dc.DrawLine(0, textTopMargin, float64(width), textTopMargin)
@@ -433,6 +435,13 @@ func drawDebugBaselines(dc *gg.Context, fontHeight, lineSpacing, textTopMargin f
 		dc.DrawLine(0, roundedY, float64(width), roundedY)
 		dc.Stroke()
 	}
+}
+
+// measureFontHeight returns the height of the currently loaded font.
+// It uses "Mg" as reference characters to capture both ascenders and descenders.
+func measureFontHeight(dc *gg.Context) float64 {
+	_, height := dc.MeasureString("Mg")
+	return height
 }
 
 // hexToRGB converts hex color string to color.RGBA
