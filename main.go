@@ -26,7 +26,7 @@ const (
 	URLMinFontSize = 16.0
 
 	// Spacing and margins
-	TextTopMargin  = 90.0
+	TextTopMargin  = 135.0
 	TextSideMargin = 60.0
 	LineSpacing    = 1.5
 	ShadowOffset   = 2.0
@@ -416,9 +416,10 @@ func drawURL(dc *gg.Context, url string, titleFontPath string, urlFontPath strin
 	// Find the last baseline that fits within the image bounds
 	// The baseline grid starts at TextTopMargin + titleFontHeight (first baseline)
 	// and increments by titleFontHeight * LineSpacing
+	// Leave space equal to TextTopMargin at the bottom of the image
 	firstBaseline := TextTopMargin + titleFontHeight
 	baselineStep := titleFontHeight * LineSpacing
-	maxY := float64(height) - BackgroundMargin
+	maxY := float64(height) - TextTopMargin/2.0
 
 	// Find the last baseline that doesn't exceed the bottom margin
 	targetY := firstBaseline

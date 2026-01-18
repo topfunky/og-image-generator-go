@@ -320,7 +320,8 @@ func TestDrawURLPositionDynamic(t *testing.T) {
 			// Calculate the baseline grid
 			firstBaseline := TextTopMargin + titleFontHeight
 			baselineStep := titleFontHeight * LineSpacing
-			maxY := float64(tt.height) - BackgroundMargin
+			// URL should not be drawn within TextTopMargin from the bottom
+			maxY := float64(tt.height) - TextTopMargin/2
 
 			// Find the last baseline that fits
 			expectedY := firstBaseline
@@ -372,6 +373,47 @@ func TestDrawURLPositionDynamic(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestDrawURLRespectsBottomMargin(t *testing.T) {
+	fontPath := testFontPath(t)
+
+	// Test that the URL is not drawn within TextTopMargin from the bottom of the image
+	t.Run("URL respects bottom margin equal to TextTopMargin", func(t *testing.T) {
+		width := 1200
+		height := 628
+		dc := gg.NewContext(width, height)
+
+		err := drawURL(dc, "https://example.com/article", fontPath, fontPath, width, height)
+		if err != nil {
+			t.Fatalf("drawURL() error: %v", err)
+		}
+
+		// Load title font to calculate the baseline grid
+		if err := dc.LoadFontFace(fontPath, TitleFontSize); err != nil {
+			t.Fatalf("failed to load font: %v", err)
+		}
+		titleFontHeight := measureFontHeight(dc)
+
+		// Calculate the baseline grid
+		firstBaseline := TextTopMargin + titleFontHeight
+		baselineStep := titleFontHeight * LineSpacing
+		// The max Y should be height - TextTopMargin (not height - BackgroundMargin)
+		maxY := float64(height) - TextTopMargin
+
+		// Find the last baseline that fits within the margin
+		expectedY := firstBaseline
+		for y := firstBaseline; y <= maxY; y += baselineStep {
+			expectedY = y
+		}
+
+		// The URL baseline should be at least TextTopMargin away from the bottom
+		bottomDistance := float64(height) - expectedY
+		if bottomDistance < TextTopMargin {
+			t.Errorf("URL baseline at y=%f is only %f pixels from bottom (height=%d), should be at least %f",
+				expectedY, bottomDistance, height, TextTopMargin)
+		}
+	})
 }
 
 func TestRun(t *testing.T) {
