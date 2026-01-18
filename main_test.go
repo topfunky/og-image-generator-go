@@ -19,6 +19,7 @@ func testFontPath(t *testing.T) string {
 		"/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
 		"/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
 		"/System/Library/Fonts/Arial.ttf",
+		"/System/Library/Fonts/Supplemental/Arial.ttf",
 		"C:\\Windows\\Fonts\\arial.ttf",
 	}
 	for _, p := range paths {
@@ -249,7 +250,8 @@ func TestDrawTitle(t *testing.T) {
 }
 
 func TestDrawURL(t *testing.T) {
-	fontPath := testFontPath(t)
+	titleFontPath := testFontPath(t)
+	urlFontPath := testFontPath(t)
 
 	tests := []struct {
 		name    string
@@ -268,7 +270,7 @@ func TestDrawURL(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			dc := gg.NewContext(tt.width, tt.height)
-			err := drawURL(dc, tt.url, fontPath, tt.width, tt.height)
+			err := drawURL(dc, tt.url, titleFontPath, urlFontPath, tt.width, tt.height)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("drawURL() error = %v, wantErr %v", err, tt.wantErr)
 			}
@@ -277,12 +279,139 @@ func TestDrawURL(t *testing.T) {
 
 	t.Run("invalid font path", func(t *testing.T) {
 		dc := gg.NewContext(1200, 628)
-		err := drawURL(dc, "https://example.com", "/nonexistent/font.ttf", 1200, 628)
+		err := drawURL(dc, "https://example.com", "/nonexistent/title-font.ttf", "/nonexistent/font.ttf", 1200, 628)
 		if err == nil {
 			t.Error("expected error for invalid font path")
 		}
 		if !strings.Contains(err.Error(), "load font") {
 			t.Errorf("expected 'load font' error, got: %v", err)
+		}
+	})
+}
+
+func TestDrawURLPositionDynamic(t *testing.T) {
+	fontPath := testFontPath(t)
+
+	// Test that URL is positioned dynamically based on image height
+	// and sits on the baseline grid established by the title font
+	tests := []struct {
+		name   string
+		height int
+	}{
+		{"standard height", 628},
+		{"short height", 400},
+		{"tall height", 1080},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dc := gg.NewContext(1200, tt.height)
+			err := drawURL(dc, "https://example.com/article", fontPath, fontPath, 1200, tt.height)
+			if err != nil {
+				t.Fatalf("drawURL() error: %v", err)
+			}
+
+			// Load title font to calculate the baseline grid
+			if err := dc.LoadFontFace(fontPath, TitleFontSize); err != nil {
+				t.Fatalf("failed to load font: %v", err)
+			}
+			titleFontHeight := measureFontHeight(dc)
+
+			// Calculate the baseline grid
+			firstBaseline := TextTopMargin + titleFontHeight
+			baselineStep := titleFontHeight * LineSpacing
+			// URL should not be drawn within TextTopMargin from the bottom
+			maxY := float64(tt.height) - TextTopMargin/2
+
+			// Find the last baseline that fits
+			expectedY := firstBaseline
+			for y := firstBaseline; y <= maxY; y += baselineStep {
+				expectedY = y
+			}
+
+			// Verify the URL baseline is within bounds
+			if expectedY > maxY {
+				t.Errorf("URL baseline %f exceeds max allowed Y %f", expectedY, maxY)
+			}
+
+			// Verify the baseline is on the grid (should be firstBaseline + n*baselineStep)
+			stepsFromFirst := (expectedY - firstBaseline) / baselineStep
+			if stepsFromFirst < 0 {
+				t.Errorf("URL baseline is before first baseline")
+			}
+
+			// The URL should be visible - check for non-background pixels
+			img := dc.Image()
+
+			// Check around the expected baseline position
+			foundURLPixels := false
+			searchStart := int(expectedY) - 30
+			if searchStart < 0 {
+				searchStart = 0
+			}
+			searchEnd := int(expectedY) + 10
+			if searchEnd > tt.height {
+				searchEnd = tt.height
+			}
+
+			for y := searchStart; y < searchEnd; y++ {
+				for x := int(TextSideMargin); x < 400; x++ {
+					r, g, b, a := img.At(x, y).RGBA()
+					// Look for non-transparent, non-black pixels (the muted text color)
+					if a > 0 && (r > 0 || g > 0 || b > 0) {
+						foundURLPixels = true
+						break
+					}
+				}
+				if foundURLPixels {
+					break
+				}
+			}
+
+			if !foundURLPixels {
+				t.Errorf("URL text not found near expected baseline %f (height=%d)", expectedY, tt.height)
+			}
+		})
+	}
+}
+
+func TestDrawURLRespectsBottomMargin(t *testing.T) {
+	fontPath := testFontPath(t)
+
+	// Test that the URL is not drawn within TextTopMargin from the bottom of the image
+	t.Run("URL respects bottom margin equal to TextTopMargin", func(t *testing.T) {
+		width := 1200
+		height := 628
+		dc := gg.NewContext(width, height)
+
+		err := drawURL(dc, "https://example.com/article", fontPath, fontPath, width, height)
+		if err != nil {
+			t.Fatalf("drawURL() error: %v", err)
+		}
+
+		// Load title font to calculate the baseline grid
+		if err := dc.LoadFontFace(fontPath, TitleFontSize); err != nil {
+			t.Fatalf("failed to load font: %v", err)
+		}
+		titleFontHeight := measureFontHeight(dc)
+
+		// Calculate the baseline grid
+		firstBaseline := TextTopMargin + titleFontHeight
+		baselineStep := titleFontHeight * LineSpacing
+		// The max Y should be height - TextTopMargin (not height - BackgroundMargin)
+		maxY := float64(height) - TextTopMargin
+
+		// Find the last baseline that fits within the margin
+		expectedY := firstBaseline
+		for y := firstBaseline; y <= maxY; y += baselineStep {
+			expectedY = y
+		}
+
+		// The URL baseline should be at least TextTopMargin away from the bottom
+		bottomDistance := float64(height) - expectedY
+		if bottomDistance < TextTopMargin {
+			t.Errorf("URL baseline at y=%f is only %f pixels from bottom (height=%d), should be at least %f",
+				expectedY, bottomDistance, height, TextTopMargin)
 		}
 	})
 }
@@ -982,7 +1111,7 @@ func TestPreventOrphansLineBalancing(t *testing.T) {
 			expected: []string{"aaaa bb", "cc dd", "ee ff"},
 		},
 		{
-			name: "no balancing needed when lines are already balanced",
+			name:     "no balancing needed when lines are already balanced",
 			input:    []string{"aaaa bbbb", "cccc dddd", "ee ff"},
 			expected: []string{"aaaa bbbb", "cccc dddd", "ee ff"},
 		},
@@ -1033,6 +1162,150 @@ func TestPreventOrphansLineBalancing(t *testing.T) {
 func TestMain(m *testing.M) {
 	// This runs all tests
 	os.Exit(m.Run())
+}
+
+func TestDebugFlag(t *testing.T) {
+	t.Run("debug flag parsed correctly", func(t *testing.T) {
+		oldArgs := os.Args
+		defer func() { os.Args = oldArgs }()
+
+		os.Args = []string{
+			"og-image-generator",
+			"-title", "Test Title",
+			"-url", "https://example.com",
+			"-debug",
+		}
+		resetFlags()
+
+		opts, err := parseFlags()
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		if !opts.Debug {
+			t.Error("expected Debug to be true when -debug flag is passed")
+		}
+	})
+
+	t.Run("debug flag defaults to false", func(t *testing.T) {
+		oldArgs := os.Args
+		defer func() { os.Args = oldArgs }()
+
+		os.Args = []string{
+			"og-image-generator",
+			"-title", "Test Title",
+			"-url", "https://example.com",
+		}
+		resetFlags()
+
+		opts, err := parseFlags()
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		if opts.Debug {
+			t.Error("expected Debug to be false by default")
+		}
+	})
+}
+
+func TestDrawDebugBaselines(t *testing.T) {
+	fontPath := testFontPath(t)
+
+	t.Run("draws baseline at correct position", func(t *testing.T) {
+		dc := gg.NewContext(1200, 628)
+
+		// Load font to get proper metrics
+		if err := dc.LoadFontFace(fontPath, 72); err != nil {
+			t.Fatalf("failed to load font: %v", err)
+		}
+
+		textTopMargin := 90.0
+		lineSpacing := 1.5
+		_, fontHeight := dc.MeasureString("Mg")
+		verticalOffset := fontHeight
+
+		// Calculate expected first baseline position (same as drawTitle)
+		expectedFirstBaseline := textTopMargin + verticalOffset
+
+		// Draw debug baselines
+		drawDebugBaselines(dc, fontHeight, lineSpacing, textTopMargin, 1200, 628)
+
+		// Verify a red pixel exists at the baseline position
+		// Check at x=100 (middle of the line) and y=expectedFirstBaseline
+		img := dc.Image()
+		r, g, b, _ := img.At(100, int(expectedFirstBaseline)).RGBA()
+
+		// Red should be high, green and blue should be low
+		if r>>8 < 200 || g>>8 > 50 || b>>8 > 50 {
+			t.Errorf("expected red pixel at baseline y=%d, got RGBA(%d, %d, %d, _)",
+				int(expectedFirstBaseline), r>>8, g>>8, b>>8)
+		}
+	})
+
+	t.Run("draws multiple baselines at line height intervals", func(t *testing.T) {
+		dc := gg.NewContext(1200, 628)
+
+		if err := dc.LoadFontFace(fontPath, 72); err != nil {
+			t.Fatalf("failed to load font: %v", err)
+		}
+
+		textTopMargin := 90.0
+		lineSpacing := 1.5
+		_, fontHeight := dc.MeasureString("Mg")
+		verticalOffset := fontHeight
+
+		drawDebugBaselines(dc, fontHeight, lineSpacing, textTopMargin, 1200, 628)
+
+		img := dc.Image()
+
+		// Check first baseline
+		firstBaseline := textTopMargin + verticalOffset
+		r1, g1, b1, _ := img.At(100, int(firstBaseline)).RGBA()
+		if r1>>8 < 200 || g1>>8 > 50 || b1>>8 > 50 {
+			t.Errorf("expected red pixel at first baseline y=%d", int(firstBaseline))
+		}
+
+		// Check second baseline (one line height * spacing down)
+		secondBaseline := firstBaseline + fontHeight*lineSpacing
+		r2, g2, b2, _ := img.At(100, int(secondBaseline)).RGBA()
+		if r2>>8 < 200 || g2>>8 > 50 || b2>>8 > 50 {
+			t.Errorf("expected red pixel at second baseline y=%d", int(secondBaseline))
+		}
+	})
+}
+
+func TestRunWithDebugFlag(t *testing.T) {
+	fontPath := testFontPath(t)
+
+	t.Run("debug mode generates image with baselines", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		outputPath := filepath.Join(tmpDir, "debug-output.png")
+
+		oldArgs := os.Args
+		defer func() { os.Args = oldArgs }()
+
+		os.Args = []string{
+			"og-image-generator",
+			"-title", "Test Title",
+			"-url", "https://example.com",
+			"-output", outputPath,
+			"-title-font", fontPath,
+			"-url-font", fontPath,
+			"-debug",
+		}
+		resetFlags()
+
+		err := run()
+		if err != nil {
+			t.Errorf("run() unexpected error: %v", err)
+		}
+
+		// Verify output file was created
+		if _, err := os.Stat(outputPath); os.IsNotExist(err) {
+			t.Error("output file was not created")
+		}
+	})
 }
 
 func TestRunWithResolverTitleFontError(t *testing.T) {

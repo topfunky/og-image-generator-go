@@ -4,8 +4,10 @@ import (
 	"flag"
 	"fmt"
 	"image/color"
+	"math"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/fogleman/gg"
@@ -14,6 +16,34 @@ import (
 var (
 	version = "dev"
 	commit  = "unknown"
+)
+
+// Typographic constants
+const (
+	// Font sizes
+	TitleFontSize  = 72.0
+	URLFontSize    = 40.0
+	URLMinFontSize = 16.0
+
+	// Spacing and margins
+	TextTopMargin  = 135.0
+	TextSideMargin = 60.0
+	LineSpacing    = 1.5
+	ShadowOffset   = 2.0
+
+	// Background
+	BackgroundMargin       = 20.0
+	BackgroundCornerRadius = 20.0
+	BackgroundOverlayAlpha = 100
+)
+
+// Default colors
+var (
+	defaultBgColor = color.RGBA{26, 26, 46, 255}
+	shadowColor    = color.Black
+	textColor      = color.White
+	mutedTextColor = color.RGBA{R: 200, G: 200, B: 200, A: 220}
+	debugColor     = color.RGBA{255, 0, 0, 255}
 )
 
 func main() {
@@ -57,7 +87,16 @@ func runWithResolver(resolver fontResolver) error {
 		return err
 	}
 
-	if err := drawURL(dc, opts.URL, urlFontPath, opts.Width, opts.Height); err != nil {
+	if opts.Debug {
+		// Load font to get metrics for debug baselines
+		if err := dc.LoadFontFace(titleFontPath, TitleFontSize); err != nil {
+			return fmt.Errorf("load font for debug: %w", err)
+		}
+		fontHeight := measureFontHeight(dc)
+		drawDebugBaselines(dc, fontHeight, LineSpacing, TextTopMargin, opts.Width, opts.Height)
+	}
+
+	if err := drawURL(dc, opts.URL, titleFontPath, urlFontPath, opts.Width, opts.Height); err != nil {
 		return err
 	}
 
@@ -69,6 +108,7 @@ func runWithResolver(resolver fontResolver) error {
 	return nil
 }
 
+// Options holds the configuration for image generation
 type Options struct {
 	Title     string
 	URL       string
@@ -78,6 +118,7 @@ type Options struct {
 	BgColor   string
 	TitleFont string
 	URLFont   string
+	Debug     bool
 }
 
 // ErrVersionRequested is returned when the -version flag is passed
@@ -96,6 +137,7 @@ func parseFlags() (*Options, error) {
 	titleFont := flag.String("title-font", "", "Title font file path (TTF)")
 	urlFont := flag.String("url-font", "", "URL font file path (TTF)")
 	versionFlag := flag.Bool("version", false, "Print version and exit")
+	debug := flag.Bool("debug", false, "Draw debug baselines")
 
 	flag.Parse()
 
@@ -119,6 +161,7 @@ func parseFlags() (*Options, error) {
 		BgColor:   *bgColor,
 		TitleFont: *titleFont,
 		URLFont:   *urlFont,
+		Debug:     *debug,
 	}, nil
 }
 
@@ -167,9 +210,8 @@ func drawBackground(dc *gg.Context, bgColorStr string, width, height int) {
 	dc.SetColor(bgRGB)
 	dc.Clear()
 
-	margin := 20.0
-	dc.SetColor(color.RGBA{0, 0, 0, 100})
-	drawRoundedTopRect(dc, margin, margin, float64(width)-(2*margin), float64(height)-(2*margin), 20.0)
+	dc.SetColor(color.RGBA{0, 0, 0, BackgroundOverlayAlpha})
+	drawRoundedTopRect(dc, BackgroundMargin, BackgroundMargin, float64(width)-(2*BackgroundMargin), float64(height)-(2*BackgroundMargin), BackgroundCornerRadius)
 	dc.Fill()
 }
 
@@ -203,32 +245,32 @@ func wrapText(dc *gg.Context, text string, maxWidth float64) []string {
 	}
 
 	var lines []string
-	var currentLine string
+	var currentLine strings.Builder
 
 	for _, word := range words {
-		testLine := currentLine
+		testLine := currentLine.String()
 		if testLine != "" {
 			testLine += " "
 		}
 		testLine += word
 
 		w, _ := dc.MeasureString(testLine)
-		if w > maxWidth && currentLine != "" {
-			lines = append(lines, currentLine)
-			currentLine = word
+		if w > maxWidth && currentLine.Len() > 0 {
+			lines = append(lines, currentLine.String())
+			currentLine.Reset()
+			currentLine.WriteString(word)
 		} else {
-			currentLine = testLine
+			if currentLine.Len() > 0 {
+				currentLine.WriteString(" ")
+			}
+			currentLine.WriteString(word)
 		}
 	}
-	if currentLine != "" {
-		lines = append(lines, currentLine)
+	if currentLine.Len() > 0 {
+		lines = append(lines, currentLine.String())
 	}
 
-	// Prevent orphans: if last line has only one word and there's a previous line,
-	// move the last word from the previous line to the last line
-	lines = preventOrphans(lines)
-
-	return lines
+	return preventOrphans(lines)
 }
 
 // preventOrphans checks if the last line has only one word and if so,
@@ -265,17 +307,13 @@ func preventOrphans(lines []string) []string {
 	lines[len(lines)-1] = newLastLine
 
 	// Now check if we need to balance lines above the modified line
-	// Work backwards from the modified line (len(lines)-2)
-	lines = balanceLinesUpward(lines, len(lines)-2)
-
-	return lines
+	return balanceLinesUpward(lines, len(lines)-2)
 }
 
 // balanceLinesUpward checks if the line at modifiedIdx can be balanced with the line above it.
 // If the line above ends with two words that both start after the length of the modified line,
 // move one word down to balance. This process continues upward as needed.
 func balanceLinesUpward(lines []string, modifiedIdx int) []string {
-	// Need at least a line above the modified line
 	if modifiedIdx < 1 {
 		return lines
 	}
@@ -293,7 +331,6 @@ func balanceLinesUpward(lines []string, modifiedIdx int) []string {
 		}
 
 		// Check if the last two words of the line above both start after the current line's length
-		// Build the line without the last word to find where the second-to-last word starts
 		lineWithoutLastWord := strings.Join(aboveWords[:len(aboveWords)-1], " ")
 		secondToLastWordStart := len(strings.Join(aboveWords[:len(aboveWords)-2], " "))
 		if len(aboveWords) > 2 {
@@ -303,13 +340,9 @@ func balanceLinesUpward(lines []string, modifiedIdx int) []string {
 		// If the second-to-last word starts at or after the current line's length,
 		// both trailing words are "hanging" past the current line, so move one down
 		if secondToLastWordStart >= currentLen {
-			// Move the last word from the line above to the current line
 			wordToMove := aboveWords[len(aboveWords)-1]
-			newAboveLine := lineWithoutLastWord
-			newCurrentLine := wordToMove + " " + currentLine
-
-			lines[idx-1] = newAboveLine
-			lines[idx] = newCurrentLine
+			lines[idx-1] = lineWithoutLastWord
+			lines[idx] = wordToMove + " " + currentLine
 			// Continue checking upward since we modified line idx-1
 		} else {
 			// No balancing needed at this level, stop propagating
@@ -320,46 +353,43 @@ func balanceLinesUpward(lines []string, modifiedIdx int) []string {
 	return lines
 }
 
+// drawTextWithShadow draws text with a shadow effect at the specified position
+func drawTextWithShadow(dc *gg.Context, text string, x, y float64) {
+	// Draw shadow
+	dc.SetColor(shadowColor)
+	dc.DrawString(text, x+ShadowOffset, y+ShadowOffset)
+
+	// Draw text
+	dc.SetColor(textColor)
+	dc.DrawString(text, x, y)
+}
+
 func drawTitle(dc *gg.Context, title, fontPath string, width int) error {
-	if err := dc.LoadFontFace(fontPath, 72); err != nil {
+	if err := dc.LoadFontFace(fontPath, TitleFontSize); err != nil {
 		return fmt.Errorf("load font: %w", err)
 	}
 
-	textRightMargin := 60.0
-	textTopMargin := 90.0
-	maxWidth := float64(width) - (2 * textRightMargin)
-	lineSpacing := 1.5
-
+	maxWidth := float64(width) - (2 * TextSideMargin)
 	lines := wrapText(dc, title, maxWidth)
 
-	// Get font metrics for line height calculation
-	_, fontHeight := dc.MeasureString("Mg") // Use typical characters for height
+	fontHeight := measureFontHeight(dc)
 	verticalOffset := fontHeight
 
-	// Draw shadow
-	dc.SetColor(color.Black)
 	for i, line := range lines {
-		y := textTopMargin + 2 + float64(i)*fontHeight*lineSpacing + verticalOffset
-		dc.DrawString(line, textRightMargin+2, y)
-	}
-
-	// Draw text
-	dc.SetColor(color.White)
-	for i, line := range lines {
-		y := textTopMargin + float64(i)*fontHeight*lineSpacing + verticalOffset
-		dc.DrawString(line, textRightMargin, y)
+		y := TextTopMargin + float64(i)*fontHeight*LineSpacing + verticalOffset
+		drawTextWithShadow(dc, line, TextSideMargin, y)
 	}
 
 	return nil
 }
 
-func drawURL(dc *gg.Context, url, fontPath string, width, height int) error {
-	maxWidth := float64(width) - 120.0
-	fontSize := 40.0
-	minFontSize := 16.0
+func drawURL(dc *gg.Context, url string, titleFontPath string, urlFontPath string, width, height int) error {
+	maxWidth := float64(width) - (2 * TextSideMargin)
 
-	for fontSize >= minFontSize {
-		if err := dc.LoadFontFace(fontPath, fontSize); err != nil {
+	// Find the appropriate font size that fits the URL
+	urlFontSize := URLFontSize
+	for urlFontSize >= URLMinFontSize {
+		if err := dc.LoadFontFace(urlFontPath, urlFontSize); err != nil {
 			return fmt.Errorf("load font for url: %w", err)
 		}
 
@@ -367,30 +397,92 @@ func drawURL(dc *gg.Context, url, fontPath string, width, height int) error {
 		if textWidth <= maxWidth {
 			break
 		}
-
-		fontSize -= 2.0
+		urlFontSize -= 2.0
 	}
 
-	mutedColor := color.RGBA{R: 200, G: 200, B: 200, A: 220}
-	dc.SetColor(mutedColor)
-	urlY := float64(height) - 70.0
-	dc.DrawString(url, 60.0, urlY)
+	// Ensure font is loaded at final size
+	if err := dc.LoadFontFace(urlFontPath, urlFontSize); err != nil {
+		return fmt.Errorf("load font for url: %w", err)
+	}
+
+	dc.SetColor(mutedTextColor)
+
+	// Calculate the baseline grid using the title font metrics
+	titleFontHeight, err := getFontHeight(titleFontPath, TitleFontSize, width, height)
+	if err != nil {
+		return fmt.Errorf("load title font for baseline: %w", err)
+	}
+
+	// Find the last baseline that fits within the image bounds
+	// The baseline grid starts at TextTopMargin + titleFontHeight (first baseline)
+	// and increments by titleFontHeight * LineSpacing
+	// Leave space equal to TextTopMargin at the bottom of the image
+	firstBaseline := TextTopMargin + titleFontHeight
+	baselineStep := titleFontHeight * LineSpacing
+	maxY := float64(height) - TextTopMargin/2.0
+
+	// Find the last baseline that doesn't exceed the bottom margin
+	targetY := firstBaseline
+	for y := firstBaseline; y <= maxY; y += baselineStep {
+		targetY = y
+	}
+
+	dc.DrawString(url, TextSideMargin, targetY)
 
 	return nil
+}
+
+// getFontHeight returns the height of a font at a given size
+func getFontHeight(fontPath string, fontSize float64, width, height int) (float64, error) {
+	tempDc := gg.NewContext(width, height)
+	if err := tempDc.LoadFontFace(fontPath, fontSize); err != nil {
+		return 0, err
+	}
+	return measureFontHeight(tempDc), nil
+}
+
+// drawDebugBaselines draws hairline red lines at each typographic baseline
+func drawDebugBaselines(dc *gg.Context, fontHeight, lineSpacing, textTopMargin float64, width, height int) {
+	dc.SetColor(debugColor)
+	dc.SetLineWidth(2)
+
+	firstBaseline := textTopMargin + fontHeight
+
+	// Draw top margin line
+	dc.DrawLine(0, textTopMargin, float64(width), textTopMargin)
+	dc.Stroke()
+
+	// Draw baselines at each line height interval until we reach the bottom
+	for y := firstBaseline; y < float64(height); y += fontHeight * lineSpacing {
+		roundedY := math.Round(y*2) / 2
+		dc.DrawLine(0, roundedY, float64(width), roundedY)
+		dc.Stroke()
+	}
+}
+
+// measureFontHeight returns the height of the currently loaded font.
+// It uses "Mg" as reference characters to capture both ascenders and descenders.
+func measureFontHeight(dc *gg.Context) float64 {
+	_, height := dc.MeasureString("Mg")
+	return height
 }
 
 // hexToRGB converts hex color string to color.RGBA
 func hexToRGB(hexColor string) color.Color {
 	hexColor = strings.TrimPrefix(hexColor, "#")
 	if len(hexColor) != 6 {
-		return color.RGBA{26, 26, 46, 255} // default dark blue
+		return defaultBgColor
 	}
 
-	var r, g, b uint8
-	_, err := fmt.Sscanf(hexColor, "%02x%02x%02x", &r, &g, &b)
+	val, err := strconv.ParseUint(hexColor, 16, 32)
 	if err != nil {
-		return color.RGBA{26, 26, 46, 255} // default on error
+		return defaultBgColor
 	}
 
-	return color.RGBA{r, g, b, 255}
+	return color.RGBA{
+		R: uint8(val >> 16),
+		G: uint8(val >> 8),
+		B: uint8(val),
+		A: 255,
+	}
 }

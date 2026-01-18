@@ -19,7 +19,7 @@ echo "=== Example 1: Basic usage ==="
 echo ""
 echo "=== Example 1 alt: Basic usage ==="
 ./og-image-generator \
-  -title "Do first, and understand later" \
+  -title "Do first, and then understand later" \
   -url "https://example.com/go-apis" \
   -output out/do-first-understand-later.png
 
@@ -64,6 +64,15 @@ echo "=== Example 4 short: Very long title with short words (tests text wrapping
   -url "https://example.com/advanced-patterns" \
   -output out/short-words.png \
   -bg "#cc00cc"
+
+echo ""
+echo "=== Example 4 debug: Activate debug mode ==="
+./og-image-generator \
+  -title "The as via or with can alt vip run task bib bit lip too lid not eql mut var let const" \
+  -url "https://example.com/advanced-patterns" \
+  -output out/debug-baselines.png \
+  -debug \
+  -bg "#00cccc"
 
 echo ""
 echo "=== Example 5: Orphan prevention - title that would end with single word ==="
