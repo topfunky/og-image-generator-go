@@ -40,3 +40,30 @@ The baseline grid must be calculated from the **title font**, not the URL font. 
 
 - `TestDrawURLPositionDynamic` - Verifies URL positioning works correctly for various image heights (400, 628, 1080 pixels)
 - Tests confirm the URL sits on the baseline grid and remains within image bounds
+
+---
+
+## 2026-01-17: URL Bottom Margin Improvement
+
+### Problem
+
+The URL was being positioned using `BackgroundMargin` (20 pixels) as the bottom boundary, which allowed the URL to be drawn very close to the bottom edge of the image. This created visual imbalance since the top margin (`TextTopMargin`) is 90 pixels.
+
+### Solution
+
+Changed `drawURL` to use `TextTopMargin` instead of `BackgroundMargin` for the bottom boundary calculation:
+
+```go
+// Before
+maxY := float64(height) - BackgroundMargin
+
+// After
+maxY := float64(height) - TextTopMargin
+```
+
+This creates visual symmetry by ensuring the same spacing (90 pixels) is maintained at both the top and bottom of the image.
+
+### Tests Updated
+
+- `TestDrawURLPositionDynamic` - Updated to expect URL positioning that respects the new bottom margin
+- `TestDrawURLRespectsBottomMargin` - New test that explicitly verifies the URL baseline is at least `TextTopMargin` (90 pixels) away from the bottom of the image
