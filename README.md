@@ -9,6 +9,8 @@ Based on the approach from [Mat Ryer's blog post](https://pace.dev/blog/2020/03/
 ## Features
 
 - **Optimized Dimensions**: Generates 1200x628px images optimized for Twitter/Facebook (configurable)
+- **Typography**: Applies a text layout algorithm to ensure that text is balanced (no orphans; single words on the last visible line)
+- **Baseline grid**: Places text on a consistent grid, calculated from actual title font, size, and line height
 - **Text Rendering**: Displays article titles with text shadows for improved readability
 - **Visual Design**: Semi-transparent overlays and customizable background colors
 - **Automatic font sizing**: URLs of any length will be sized to fit the card dimensions
