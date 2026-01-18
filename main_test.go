@@ -230,7 +230,7 @@ func TestDrawTitle(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			dc := gg.NewContext(tt.width, 628)
-			err := drawTitle(dc, tt.title, fontPath, tt.width)
+			err := drawTitle(dc, tt.title, fontPath, tt.width, TitleFontSize)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("drawTitle() error = %v, wantErr %v", err, tt.wantErr)
 			}
@@ -239,7 +239,7 @@ func TestDrawTitle(t *testing.T) {
 
 	t.Run("invalid font path", func(t *testing.T) {
 		dc := gg.NewContext(1200, 628)
-		err := drawTitle(dc, "Test", "/nonexistent/font.ttf", 1200)
+		err := drawTitle(dc, "Test", "/nonexistent/font.ttf", 1200, TitleFontSize)
 		if err == nil {
 			t.Error("expected error for invalid font path")
 		}
@@ -270,7 +270,7 @@ func TestDrawURL(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			dc := gg.NewContext(tt.width, tt.height)
-			err := drawURL(dc, tt.url, titleFontPath, urlFontPath, tt.width, tt.height)
+			err := drawURL(dc, tt.url, titleFontPath, urlFontPath, tt.width, tt.height, TitleFontSize)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("drawURL() error = %v, wantErr %v", err, tt.wantErr)
 			}
@@ -279,7 +279,7 @@ func TestDrawURL(t *testing.T) {
 
 	t.Run("invalid font path", func(t *testing.T) {
 		dc := gg.NewContext(1200, 628)
-		err := drawURL(dc, "https://example.com", "/nonexistent/title-font.ttf", "/nonexistent/font.ttf", 1200, 628)
+		err := drawURL(dc, "https://example.com", "/nonexistent/title-font.ttf", "/nonexistent/font.ttf", 1200, 628, TitleFontSize)
 		if err == nil {
 			t.Error("expected error for invalid font path")
 		}
@@ -306,7 +306,7 @@ func TestDrawURLPositionDynamic(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			dc := gg.NewContext(1200, tt.height)
-			err := drawURL(dc, "https://example.com/article", fontPath, fontPath, 1200, tt.height)
+			err := drawURL(dc, "https://example.com/article", fontPath, fontPath, 1200, tt.height, TitleFontSize)
 			if err != nil {
 				t.Fatalf("drawURL() error: %v", err)
 			}
@@ -384,7 +384,7 @@ func TestDrawURLRespectsBottomMargin(t *testing.T) {
 		height := 628
 		dc := gg.NewContext(width, height)
 
-		err := drawURL(dc, "https://example.com/article", fontPath, fontPath, width, height)
+		err := drawURL(dc, "https://example.com/article", fontPath, fontPath, width, height, TitleFontSize)
 		if err != nil {
 			t.Fatalf("drawURL() error: %v", err)
 		}
@@ -1205,6 +1205,51 @@ func TestDebugFlag(t *testing.T) {
 
 		if opts.Debug {
 			t.Error("expected Debug to be false by default")
+		}
+	})
+}
+
+func TestTitleSizeFlag(t *testing.T) {
+	t.Run("title-size flag parsed correctly", func(t *testing.T) {
+		oldArgs := os.Args
+		defer func() { os.Args = oldArgs }()
+
+		os.Args = []string{
+			"og-image-generator",
+			"-title", "Test Title",
+			"-url", "https://example.com",
+			"-title-size", "96",
+		}
+		resetFlags()
+
+		opts, err := parseFlags()
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		if opts.TitleSize != 96.0 {
+			t.Errorf("expected TitleSize to be 96.0, got %f", opts.TitleSize)
+		}
+	})
+
+	t.Run("title-size flag defaults to TitleFontSize constant", func(t *testing.T) {
+		oldArgs := os.Args
+		defer func() { os.Args = oldArgs }()
+
+		os.Args = []string{
+			"og-image-generator",
+			"-title", "Test Title",
+			"-url", "https://example.com",
+		}
+		resetFlags()
+
+		opts, err := parseFlags()
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+
+		if opts.TitleSize != TitleFontSize {
+			t.Errorf("expected TitleSize to default to %f, got %f", TitleFontSize, opts.TitleSize)
 		}
 	})
 }

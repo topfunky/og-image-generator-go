@@ -83,20 +83,20 @@ func runWithResolver(resolver fontResolver) error {
 
 	drawBackground(dc, opts.BgColor, opts.Width, opts.Height)
 
-	if err := drawTitle(dc, opts.Title, titleFontPath, opts.Width); err != nil {
+	if err := drawTitle(dc, opts.Title, titleFontPath, opts.Width, opts.TitleSize); err != nil {
 		return err
 	}
 
 	if opts.Debug {
 		// Load font to get metrics for debug baselines
-		if err := dc.LoadFontFace(titleFontPath, TitleFontSize); err != nil {
+		if err := dc.LoadFontFace(titleFontPath, opts.TitleSize); err != nil {
 			return fmt.Errorf("load font for debug: %w", err)
 		}
 		fontHeight := measureFontHeight(dc)
 		drawDebugBaselines(dc, fontHeight, LineSpacing, TextTopMargin, opts.Width, opts.Height)
 	}
 
-	if err := drawURL(dc, opts.URL, titleFontPath, urlFontPath, opts.Width, opts.Height); err != nil {
+	if err := drawURL(dc, opts.URL, titleFontPath, urlFontPath, opts.Width, opts.Height, opts.TitleSize); err != nil {
 		return err
 	}
 
@@ -118,6 +118,7 @@ type Options struct {
 	BgColor   string
 	TitleFont string
 	URLFont   string
+	TitleSize float64
 	Debug     bool
 }
 
@@ -136,6 +137,7 @@ func parseFlags() (*Options, error) {
 	bgColor := flag.String("bg", "#1a1a2e", "Background color (hex)")
 	titleFont := flag.String("title-font", "", "Title font file path (TTF)")
 	urlFont := flag.String("url-font", "", "URL font file path (TTF)")
+	titleSize := flag.Float64("title-size", TitleFontSize, "Title font size in points")
 	versionFlag := flag.Bool("version", false, "Print version and exit")
 	debug := flag.Bool("debug", false, "Draw debug baselines")
 
@@ -161,6 +163,7 @@ func parseFlags() (*Options, error) {
 		BgColor:   *bgColor,
 		TitleFont: *titleFont,
 		URLFont:   *urlFont,
+		TitleSize: *titleSize,
 		Debug:     *debug,
 	}, nil
 }
@@ -364,8 +367,8 @@ func drawTextWithShadow(dc *gg.Context, text string, x, y float64) {
 	dc.DrawString(text, x, y)
 }
 
-func drawTitle(dc *gg.Context, title, fontPath string, width int) error {
-	if err := dc.LoadFontFace(fontPath, TitleFontSize); err != nil {
+func drawTitle(dc *gg.Context, title, fontPath string, width int, fontSize float64) error {
+	if err := dc.LoadFontFace(fontPath, fontSize); err != nil {
 		return fmt.Errorf("load font: %w", err)
 	}
 
@@ -383,7 +386,7 @@ func drawTitle(dc *gg.Context, title, fontPath string, width int) error {
 	return nil
 }
 
-func drawURL(dc *gg.Context, url string, titleFontPath string, urlFontPath string, width, height int) error {
+func drawURL(dc *gg.Context, url string, titleFontPath string, urlFontPath string, width, height int, titleFontSize float64) error {
 	maxWidth := float64(width) - (2 * TextSideMargin)
 
 	// Find the appropriate font size that fits the URL
@@ -408,7 +411,7 @@ func drawURL(dc *gg.Context, url string, titleFontPath string, urlFontPath strin
 	dc.SetColor(mutedTextColor)
 
 	// Calculate the baseline grid using the title font metrics
-	titleFontHeight, err := getFontHeight(titleFontPath, TitleFontSize, width, height)
+	titleFontHeight, err := getFontHeight(titleFontPath, titleFontSize, width, height)
 	if err != nil {
 		return fmt.Errorf("load title font for baseline: %w", err)
 	}
