@@ -48,6 +48,15 @@ echo "=== Example 4: Very long title (tests text wrapping) ==="
   -output out/long-title.png \
   -bg "#2c3e50"
 
+echo ""
+echo "=== Example 4 big: Very long title large font (tests text wrapping) ==="
+./og-image-generator \
+  -title "Advanced Patterns for Building High Performance, Scalable Go Apps" \
+  -url "https://example.com/advanced-patterns" \
+  -title-size 80 \
+  -output out/large-title.png \
+  -bg "#2c3e50"
+
 
 echo ""
 echo "=== Example 4 alt: Very long title alt (tests text wrapping) ==="
